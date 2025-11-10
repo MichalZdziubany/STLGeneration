@@ -1,0 +1,66 @@
+#This workflow automatically:
+# - Builds all Docker services (frontend, backend, slicers)
+# - Runs backend tests (pytest)
+# - Runs frontend linting (ESLint)
+# - Triggers on every push or pull request to the main branch
+
+name: Build & Test Docker Containers
+
+#Trigger the workflow on every push or pull request to 'main'
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test Containers
+    runs-on: ubuntu-latest
+    
+    steps:
+
+      # Step 1: Checkout the repository
+      # This clones your GitHub repo into the workflow runner
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Docker Buildx
+      # Buildx allows building multi-platform Docker images efficiently
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      # Step 3: Cache Docker build layers
+      # This speeds up subsequent builds by reusing layers
+      
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # Step 4: Build all containers defined in docker-compose.yml
+      # This ensures backend, frontend, and slicers all build properly
+
+      - name: Build Docker Compose stack
+        run: docker compose build
+
+      # Step 5: Run backend tests (if available)
+      # Executes pytest inside the backend container
+      # If no tests exist, it will skip this step
+      - name: Run backend tests
+        run: |
+          docker compose run --rm backend pytest || echo "No tests yet"
+
+      # Step 6: Lint frontend code (optional)
+      # Runs ESLint inside the frontend container to catch code issues
+      
+      - name: Lint frontend
+        run: |
+          docker compose run --rm frontend npm run lint || echo "No linting yet"

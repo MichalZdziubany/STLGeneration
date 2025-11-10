@@ -1,18 +1,38 @@
-# Base Ubuntu image
 FROM ubuntu:22.04
 
-# Install wget for downloading prebuilt binary
-RUN apt-get update && apt-get install -y wget \
-    && apt-get clean \
+# Prevent interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    cmake \
+    build-essential \
+    libboost-all-dev \
+    protobuf-compiler \
+    libprotobuf-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Download prebuilt CuraEngine AppImage
-RUN wget -O /usr/local/bin/CuraEngine \
-    https://github.com/Ultimaker/CuraEngine/releases/download/5.6.1/CuraEngine-5.6.1-linux.AppImage \
-    && chmod +x /usr/local/bin/CuraEngine
+# Set working directory
+WORKDIR /opt/CuraEngine
 
-# Set working directory to /data
-WORKDIR /data
+# Clone CuraEngine source - use a specific stable tag
+RUN git clone --depth 1 --branch 5.6.0 https://github.com/Ultimaker/CuraEngine.git . && \
+    git submodule update --init --recursive
 
-# Run CuraEngine when container starts
-ENTRYPOINT ["CuraEngine"]
+# Create build directory
+RUN mkdir -p build
+WORKDIR /opt/CuraEngine/build
+
+# Run CMake with verbose output for debugging
+RUN cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build with verbose output
+RUN make -j$(nproc) VERBOSE=1
+
+# Add CuraEngine to PATH
+ENV PATH="/opt/CuraEngine/build:${PATH}"
+
+# Default command
+CMD ["CuraEngine", "--help"]

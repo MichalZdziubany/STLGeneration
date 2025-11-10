@@ -3,21 +3,26 @@ version: "3.9"
 services:
   backend:
     build: ./backend
-    container_name: backend
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
-    volumes:
-      - ./backend:/app
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/jobs:/app/jobs
+    depends_on:
+      - openscad
+      
 
-  openscad-service:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+  openscad:
     build: ./docker/openscad-service
-    container_name: openscad
     volumes:
       - ./backend/jobs:/data
 
-  curaengine-service:
-    build: ./docker/curaengine-service
-    container_name: curaengine
-    volumes:
-      - ./backend/jobs:/data
+  
