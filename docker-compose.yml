@@ -24,5 +24,8 @@ services:
     build: ./docker/openscad-service
     volumes:
       - ./backend/jobs:/data
-
+  curaengine:
+    build: ./docker/curaengine-service
+    volumes:
+      - ./backend/jobs:/data
   
