@@ -9,6 +9,7 @@ services:
       - ./backend/jobs:/app/jobs
     depends_on:
       - openscad
+      - curaengine
       
 
   frontend:
