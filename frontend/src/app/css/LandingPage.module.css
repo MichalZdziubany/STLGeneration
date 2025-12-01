@@ -1,0 +1,162 @@
+/* ============= PAGE CONTAINER ============= */
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+  background-color: white;
+}
+
+/* ============= NAVBAR ============= */
+.navbar {
+  width: 100%;
+  padding: 18px 40px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #9b9494;
+}
+
+.logo {
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #000000;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.navLinks a {
+  text-decoration: none;
+  color: #333;
+  font-size: 14px;
+}
+
+.navLinks a:hover {
+  opacity: 0.6;
+}
+
+.loginBtn {
+  padding: 8px 16px;
+  border: 1px solid #333;
+  border-radius: 20px;
+}
+
+/* ============= HERO SECTION ============= */
+.hero {
+  text-align: center;
+  padding: 40px 20px;
+  background: #ffffff;
+}
+
+.heroTitle {
+  font-size: 36px;
+  font-weight: 800;
+  max-width: 700px;
+  margin: 0 auto;
+  color: black;
+}
+
+.heroSubtitle {
+  margin-top: 16px;
+  max-width: 550px;
+  margin-left: auto;
+  margin-right: auto;
+  color: #000000;
+}
+
+.heroButtons {
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.primaryBtn {
+  background: black;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.primaryBtn:hover {
+  background: #333;
+}
+
+.secondaryBtn {
+  border: 1px solid black;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: black;
+}
+
+.secondaryBtn:hover {
+  background: #eee;
+}
+
+/* ============= TEMPLATE GRID ============= */
+.templateGrid {
+  padding: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 32px;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #9b9494;
+  border: solid white 10px;
+  border-radius: 40px;
+}
+
+.templateCard {
+  text-align: center;
+}
+
+.placeholderBox {
+  width: 100%;
+  height: 150px;
+  background: #c4c4c4;
+  border-radius: 8px;
+}
+
+.templateLabel {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+/* ============= FOOTER ============= */
+.footer {
+  margin-top: auto;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  color: #555;
+  font-size: 14px;
+  background-color: white;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 24px;
+}
+
+.footerLinks a {
+  text-decoration: none;
+  color: #444;
+}
+
+.footerLinks a:hover {
+  opacity: 0.6;
+}
+
+.socials {
+  display: flex;
+  gap: 16px;
+  font-size: 20px;
+}
