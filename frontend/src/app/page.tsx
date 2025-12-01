@@ -1,4 +1,4 @@
-import styles from "./css/LandingPage.module.css";
+import styles from "./LandingPage.module.css";
 import Link from "next/link";
 
 export default function Home() {
