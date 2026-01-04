@@ -1,7 +1,53 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import styles from "./LandingPage.module.css";
 import Link from "next/link";
 
 export default function Home() {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const [apiStatus, setApiStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [apiMessage, setApiMessage] = useState("Run the health check to verify connectivity.");
+
+  const pingBackend = useCallback(async () => {
+    setApiStatus("loading");
+    setApiMessage("Attempting to reach backend...");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/`);
+
+      if (!response.ok) {
+        throw new Error(`Backend returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setApiMessage(payload.message ?? "Backend responded successfully.");
+      setApiStatus("success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setApiMessage(message);
+      setApiStatus("error");
+    }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    pingBackend();
+  }, [pingBackend]);
+
+  const statusLabelMap = {
+    idle: "Idle",
+    loading: "Attempting",
+    success: "Connected",
+    error: "Unavailable",
+  } as const;
+
+  const statusToneClass = {
+    idle: styles.statusIdle,
+    loading: styles.statusLoading,
+    success: styles.statusSuccess,
+    error: styles.statusError,
+  }[apiStatus];
+
   return (
     <main className={styles.container}>
       {/* NAVBAR */}
@@ -40,6 +86,31 @@ export default function Home() {
             Browse Templates
           </Link>
         </div>
+      </section>
+
+      {/* CONNECTIVITY STATUS */}
+      <section className={styles.statusPanel}>
+        <div className={styles.statusHeader}>
+          <div>
+            <p className={styles.statusKicker}>Connectivity</p>
+            <h3 className={styles.statusTitle}>Frontend → Backend status</h3>
+          </div>
+
+          <span className={`${styles.statusPill} ${statusToneClass}`}>
+            {statusLabelMap[apiStatus]}
+          </span>
+        </div>
+
+        <p className={styles.statusMessage}>{apiMessage}</p>
+
+        <button
+          type="button"
+          className={styles.statusButton}
+          onClick={pingBackend}
+          disabled={apiStatus === "loading"}
+        >
+          {apiStatus === "loading" ? "Checking..." : "Run Health Check"}
+        </button>
       </section>
 
       {/* TEMPLATE GRID */}
