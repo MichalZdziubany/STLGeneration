@@ -1,13 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./LandingPage.module.css";
 import Link from "next/link";
 
+type TemplateCard = {
+  id: string;
+  name: string;
+  geometry: string;
+  file: string;
+  description: string;
+  parameters: string[];
+  tags: string[];
+  link?: string;
+};
+
 export default function Home() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const apiBaseUrl = useMemo(() => {
+    const serverDefault = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+    if (typeof window === "undefined") {
+      return serverDefault;
+    }
+
+    return process.env.NEXT_PUBLIC_API_URL_BROWSER ?? serverDefault;
+  }, []);
   const [apiStatus, setApiStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [apiMessage, setApiMessage] = useState("Run the health check to verify connectivity.");
+  const [templates, setTemplates] = useState<TemplateCard[]>([]);
+  const [templateStatus, setTemplateStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [templateMessage, setTemplateMessage] = useState("Fetching templates...");
 
   const pingBackend = useCallback(async () => {
     setApiStatus("loading");
@@ -33,6 +55,41 @@ export default function Home() {
   useEffect(() => {
     pingBackend();
   }, [pingBackend]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchTemplates = async () => {
+      setTemplateStatus("loading");
+      setTemplateMessage("Fetching templates...");
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/templates`);
+
+        if (!response.ok) {
+          throw new Error(`Backend returned ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (isMounted) {
+          setTemplates(payload.templates ?? []);
+          setTemplateStatus("ready");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load templates";
+        if (isMounted) {
+          setTemplateStatus("error");
+          setTemplateMessage(message);
+        }
+      }
+    };
+
+    fetchTemplates();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiBaseUrl]);
 
   const statusLabelMap = {
     idle: "Idle",
@@ -115,12 +172,48 @@ export default function Home() {
 
       {/* TEMPLATE GRID */}
       <section className={styles.templateGrid}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className={styles.templateCard}>
-            <div className={styles.placeholderBox}></div>
-            <p className={styles.templateLabel}>Template</p>
-          </div>
-        ))}
+        {templateStatus !== "ready" && (
+          <div className={styles.templateState}>{templateMessage}</div>
+        )}
+
+        {templateStatus === "ready" && templates.length === 0 && (
+          <div className={styles.templateState}>No templates found in backend/app/templates.</div>
+        )}
+
+        {templateStatus === "ready" &&
+          templates.map((template: TemplateCard) => (
+            <article key={template.id} className={styles.templateCard}>
+              <div className={styles.templateHeader}>
+                <span className={styles.templateGeometry}>{template.geometry}</span>
+                <span className={styles.templateFile}>{template.file}</span>
+              </div>
+
+              <h3 className={styles.templateName}>{template.name}</h3>
+              <p className={styles.templateDescription}>{template.description}</p>
+
+              {template.parameters?.length > 0 && (
+                <ul className={styles.templateParams}>
+                  {template.parameters.map((param) => (
+                    <li key={`${template.id}-${param}`}>{param}</li>
+                  ))}
+                </ul>
+              )}
+
+              {template.tags?.length > 0 && (
+                <div className={styles.templateTagRow}>
+                  {template.tags.map((tag) => (
+                    <span key={`${template.id}-${tag}`} className={styles.templateTag}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <Link href={template.link ?? "/designer"} className={styles.templateCta}>
+                Load Template →
+              </Link>
+            </article>
+          ))}
       </section>
 
       {/* FOOTER */}

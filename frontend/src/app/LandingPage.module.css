@@ -183,7 +183,7 @@
 .templateGrid {
   padding: 40px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 32px;
   width: 100%;
   box-sizing: border-box;
@@ -192,20 +192,101 @@
   border-radius: 40px;
 }
 
-.templateCard {
+.templateState {
+  grid-column: 1 / -1;
   text-align: center;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  font-weight: 600;
 }
 
-.placeholderBox {
-  width: 100%;
-  height: 150px;
-  background: #c4c4c4;
+.templateCard {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+}
+
+.templateHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.templateGeometry {
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #5c5c5c;
+}
+
+.templateFile {
+  font-size: 12px;
+  font-family: "Courier New", monospace;
+  background: #f4f4f4;
+  padding: 4px 8px;
   border-radius: 8px;
 }
 
-.templateLabel {
-  margin-top: 10px;
-  font-size: 14px;
+.templateName {
+  margin: 0;
+  font-size: 20px;
+}
+
+.templateDescription {
+  margin: 0;
+  color: #2e2e2e;
+  line-height: 1.5;
+}
+
+.templateParams {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.templateParams li {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #dcdcdc;
+  font-size: 12px;
+}
+
+.templateTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.templateTag {
+  background: black;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.templateCta {
+  margin-top: auto;
+  align-self: flex-start;
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid black;
+  padding: 10px 18px;
+  border-radius: 10px;
+  color: black;
+}
+
+.templateCta:hover {
+  background: black;
+  color: white;
 }
 
 /* ============= FOOTER ============= */

@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.generate import router as stl_router
+from app.routes.templates import router as template_router
 
 
 app = FastAPI()
@@ -26,3 +27,4 @@ def root():
 
 
 app.include_router(stl_router)
+app.include_router(template_router)
