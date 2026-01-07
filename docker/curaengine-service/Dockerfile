@@ -37,9 +37,9 @@ RUN conan config install https://github.com/ultimaker/conan-config.git
 RUN conan profile detect --force
 
 
-# Clone CuraEngine
+# Clone CuraEngine 5.11.0 (stable)
 WORKDIR /opt
-RUN git clone https://github.com/Ultimaker/CuraEngine.git
+RUN git clone --depth 1 --branch 5.11.0 https://github.com/Ultimaker/CuraEngine.git
 
 # Build directory
 WORKDIR /opt/CuraEngine/build
@@ -54,7 +54,8 @@ WORKDIR /opt/CuraEngine
 RUN cmake --preset conan-release
 RUN cmake --build --preset conan-release
 
-# Add CuraEngine to PATH
-ENV PATH="/opt/CuraEngine/build:${PATH}"
+# Add CuraEngine to PATH (release build directory)
+ENV PATH="/opt/CuraEngine/build/Release:${PATH}"
 
-CMD ["/opt/CuraEngine/build/Release/CuraEngine", "--help"]
+# Keep container alive for docker exec usage and allow quick version check
+CMD ["bash", "-lc", "CuraEngine --version || /opt/CuraEngine/build/Release/CuraEngine --version; tail -f /dev/null"]

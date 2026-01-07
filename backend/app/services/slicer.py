@@ -1,11 +1,13 @@
 import uuid
 import subprocess
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
 JOBS_DIR = Path("/app/jobs")
 SETTINGS_DIR = Path(__file__).resolve().parents[1] / "settings"
+DEFINITIONS_DIR = SETTINGS_DIR  # Definition files are also in settings dir
 
 
 def load_settings_profile(profile_name: str = "balanced_profile") -> Dict[str, Any]:
@@ -46,13 +48,38 @@ def merge_settings(base_settings: Dict[str, Any], overrides: Dict[str, Any]) -> 
     return merged
 
 
+def normalize_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize settings by removing None/empty values and converting booleans.
+    
+    Args:
+        settings: Raw settings dictionary
+        
+    Returns:
+        Normalized settings dictionary
+    """
+    normalized = {}
+    for key, value in settings.items():
+        # Skip None values
+        if value is None:
+            continue
+        # Skip empty strings
+        if isinstance(value, str) and value.strip() == "":
+            continue
+        # Convert booleans to lowercase strings
+        if isinstance(value, bool):
+            value = str(value).lower()
+        normalized[key] = value
+    return normalized
+
+
 def slice_stl_to_gcode(
     stl_path: Path,
     settings: Optional[Dict[str, Any]] = None,
     profile: str = "balanced_profile"
 ) -> Path:
     """
-    Slice an STL file to G-code using CuraEngine with a settings profile.
+    Slice an STL file to G-code using CuraEngine with a printer definition and settings profile.
     
     Args:
         stl_path: Path to the input STL file
@@ -67,48 +94,56 @@ def slice_stl_to_gcode(
     
     # Load base profile settings
     try:
-        base_settings = load_settings_profile(profile)
+        profile_data = get_profile_settings(profile)
+        base_settings = profile_data.get("settings", {})
+        # Get printer definition from profile metadata if specified
+        printer_definition = profile_data.get("metadata", {}).get("printer_definition", "ender3v3_simple.def.json")
     except FileNotFoundError:
         # Fallback to minimal defaults if profile not found
-        base_settings = {
-            "layer_height": 0.2,
-            "wall_thickness": 1.2,
-            "infill_sparse_density": 20,
-            "speed_print": 50,
-            "material_print_temperature": 200,
-            "material_bed_temperature": 60
-        }
+        base_settings = {}
+        printer_definition = "ender3v3_simple.def.json"
     
     # Merge with user overrides
     final_settings = merge_settings(base_settings, settings or {})
     
-    # Build CuraEngine command with all settings
+    # Normalize settings (remove None/empty values, convert booleans)
+    final_settings = normalize_settings(final_settings)
+    
+    # Check if printer definition file exists
+    definition_path = DEFINITIONS_DIR / printer_definition
+    if not definition_path.exists():
+        raise FileNotFoundError(f"Printer definition file not found: {printer_definition}")
+    
+    # Build CuraEngine command with definition file
+    # Set CURA_ENGINE_SEARCH_PATH to allow CuraEngine to find inherited definitions
     command = [
-        "docker",
-        "exec",
-        "3d-model-platform-curaengine-1",
-        "/opt/CuraEngine/build/Release/CuraEngine",
+        "CuraEngine",
         "slice",
         "-v",
-        "-p",
-        "-j", "/opt/CuraEngine/resources/definitions/fdmprinter.def.json",
-        "-o", f"/data/{gcode_path.name}",
+        "-j", str(definition_path),
+        "-o", str(gcode_path),
+        "-l", str(stl_path),
     ]
     
-    # Add all settings as -s parameters
+    # Add settings overrides as -s parameters
+    # The definition file provides all required defaults
     for key, value in final_settings.items():
         command.extend(["-s", f"{key}={value}"])
     
-    # Add input STL
-    command.extend(["-l", f"/data/{stl_path.name}"])
+    # Set environment variable for CuraEngine to find definition files
+    env = {
+        **subprocess.os.environ,
+        "CURA_ENGINE_SEARCH_PATH": str(DEFINITIONS_DIR)
+    }
     
     try:
-        # Run CuraEngine
+        # Run CuraEngine with custom environment
         result = subprocess.run(
             command,
             check=True,
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
         
         if not gcode_path.exists():
