@@ -31,6 +31,15 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["BASE_SIZE", "HEIGHT", "CENTERED"],
         "tags": ["Showcase", "Advanced"],
     },
+    "balanced_model_template.scad.j2": {
+        "id": "balanced_model",
+        "name": "Balanced Slicing Test",
+        "geometry": "Complex",
+        "dimensions": "Base 40-100 mm",
+        "description": "Comprehensive test model with overhangs, bridges, towers, and various features optimized for slicing validation.",
+        "parameters": ["BASE_SIZE", "OVERHANG_ANGLE", "BRIDGE_LENGTH", "WALL_THICKNESS", "TOWER_HEIGHT", "SEGMENTS"],
+        "tags": ["Testing", "Slicing", "Advanced"],
+    },
 }
 
 
@@ -56,3 +65,19 @@ def list_templates() -> List[Dict[str, Any]]:
         )
 
     return templates
+
+
+def get_template_metadata(template_id: str) -> Dict[str, Any] | None:
+    normalized_id = template_id.strip().lower()
+
+    for template in list_templates():
+        candidates = {
+            template["id"].lower(),
+            template["file"].lower(),
+            template["file"].replace(".scad.j2", "").lower(),
+        }
+
+        if normalized_id in candidates:
+            return template
+
+    return None
