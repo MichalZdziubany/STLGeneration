@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmail, signInWithGoogle } from "@/lib/auth";
+import { signInWithEmail, signInWithGoogle, requestPasswordReset, resetPasswordWithCode } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +10,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSending, setResetSending] = useState<"idle" | "sending" | "sent">("idle");
+  const [resetCode, setResetCode] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [resetting, setResetting] = useState<"idle" | "working" | "done">("idle");
 
   const handleEmailLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -117,9 +124,97 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        <p className="mt-6 text-center text-xs text-neutral-500">
-          This page is Firebase-ready: wire up src/lib/auth.ts with Firebase Auth.
-        </p>
+        <div className="mt-6 text-xs text-neutral-600 flex flex-col items-center gap-2">
+          <div>
+            Don’t have an account? <a href="/signup" className="underline">Create one</a>
+          </div>
+          <button
+            type="button"
+            className="underline text-neutral-600 hover:text-neutral-800"
+            onClick={() => {
+              setForgotOpen((v) => !v);
+              setResetOpen(false);
+            }}
+          >
+            {forgotOpen ? "Hide forgot password" : "Forgot password?"}
+          </button>
+          {forgotOpen && (
+            <div className="w-full max-w-sm mt-1">
+              <label className="block text-xs mb-1">Email</label>
+              <input
+                type="email"
+                value={resetEmail || email}
+                onChange={(e) => setResetEmail(e.target.value)}
+                className="w-full rounded-md border border-neutral-300/60 dark:border-neutral-700/60 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="you@example.com"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!(resetEmail || email)) return;
+                  setResetSending("sending");
+                  try {
+                    await requestPasswordReset(resetEmail || email);
+                    setResetSending("sent");
+                  } catch {
+                    setResetSending("idle");
+                  }
+                }}
+                className="mt-2 w-full rounded-md bg-black text-white py-2 text-sm disabled:opacity-60"
+                disabled={resetSending !== "idle"}
+              >
+                {resetSending === "sending" ? "Sending…" : resetSending === "sent" ? "Email sent" : "Send reset link"}
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="underline text-neutral-600 hover:text-neutral-800"
+            onClick={() => {
+              setResetOpen((v) => !v);
+              setForgotOpen(false);
+            }}
+          >
+            {resetOpen ? "Hide reset form" : "Have a reset code?"}
+          </button>
+          {resetOpen && (
+            <div className="w-full max-w-sm mt-1">
+              <label className="block text-xs mb-1">Reset code</label>
+              <input
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value)}
+                className="w-full rounded-md border border-neutral-300/60 dark:border-neutral-700/60 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Paste the code from your email"
+              />
+              <label className="block text-xs mb-1 mt-3">New password</label>
+              <input
+                type="password"
+                value={newPass}
+                onChange={(e) => setNewPass(e.target.value)}
+                className="w-full rounded-md border border-neutral-300/60 dark:border-neutral-700/60 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!resetCode || newPass.length < 6) return;
+                  setResetting("working");
+                  try {
+                    await resetPasswordWithCode(resetCode, newPass);
+                    setResetting("done");
+                  } finally {
+                    setTimeout(() => setResetting("idle"), 1200);
+                  }
+                }}
+                className="mt-2 w-full rounded-md bg-black text-white py-2 text-sm disabled:opacity-60"
+                disabled={resetting !== "idle"}
+              >
+                {resetting === "working" ? "Resetting…" : resetting === "done" ? "Password updated" : "Reset password"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

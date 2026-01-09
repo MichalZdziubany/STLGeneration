@@ -18,21 +18,27 @@
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
 }
 
+.inner p {
+  color: #000;
+}
+
 .title {
   margin: 0 0 6px 0;
   font-size: 28px;
   font-weight: 800;
+  color: #222;
 }
 
 .lead {
   margin: 0 0 18px 0;
-  color: #2e2e2e;
+  color: #222;
 }
 
 .sectionTitle {
   margin: 28px 0 8px 0;
   font-size: 18px;
   font-weight: 700;
+  color: #222;
 }
 
 .list {
@@ -80,12 +86,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  color: #222;
 }
 
 .input, .textarea {
   border: 1px solid #dcdcdc;
   border-radius: 8px;
   padding: 10px 12px;
+  color: #222;
 }
 
 .textarea {
