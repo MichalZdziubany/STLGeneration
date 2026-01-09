@@ -18,6 +18,7 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL_BROWSER: http://localhost:8000
     depends_on:
       - backend
 
