@@ -57,4 +57,9 @@ RUN cmake --build --preset conan-release
 # Add CuraEngine to PATH
 ENV PATH="/opt/CuraEngine/build:${PATH}"
 
+WORKDIR /opt
+RUN git clone --branch 5.0.0 --depth 1 https://github.com/Ultimaker/Cura.git
+RUN mv /opt/Cura/resources /opt/cura-resources
+ENV CURA_RESOURCES="/opt/cura-resources"
+
 CMD ["/opt/CuraEngine/build/Release/CuraEngine", "--help"]
