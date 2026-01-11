@@ -337,6 +337,30 @@ def slice_stl_to_gcode(
             if new_text != gcode_text:
                 with open(gcode_path, 'w', encoding='utf-8') as f:
                     f.write(new_text)
+
+            # Second pass: remove any SKIRT sections entirely if present
+            try:
+                lines = new_text.splitlines()
+                cleaned = []
+                in_skirt = False
+                for line in lines:
+                    if line.startswith(';TYPE:SKIRT'):
+                        in_skirt = True
+                        continue
+                    if in_skirt:
+                        # End skirt when next type or new layer begins
+                        if line.startswith(';TYPE:') or line.startswith(';LAYER:'):
+                            in_skirt = False
+                            cleaned.append(line)
+                        # Skip skirt line
+                        continue
+                    cleaned.append(line)
+                final_text = '\n'.join(cleaned)
+                if final_text != new_text:
+                    with open(gcode_path, 'w', encoding='utf-8') as f:
+                        f.write(final_text)
+            except Exception:
+                pass
         except Exception:
             # If anything goes wrong, return original file
             pass
