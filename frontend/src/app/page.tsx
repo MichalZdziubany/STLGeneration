@@ -310,7 +310,7 @@ export default function Home() {
                 </div>
               )}
 
-              <Link href={template.link ?? `/designer?id=${template.id}`} className={styles.templateCta}>
+              <Link href={template.link ?? "/designer"} className={styles.templateCta}>
                 Load Template →
               </Link>
             </article>

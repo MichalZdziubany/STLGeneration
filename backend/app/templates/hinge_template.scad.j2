@@ -1,0 +1,46 @@
+//
+// PRINT-IN-PLACE HINGE TEMPLATE
+// Alternating knuckles around a captive pin.
+// Parameters are injected by backend.
+//
+
+hinge_length = {{HINGE_LENGTH}};     // total length along Z
+knuckles     = {{KNUCKLES}};         // number of knuckles (>=3 recommended)
+outer_d      = {{OUTER_DIAMETER}};   // outer diameter of each knuckle
+pin_d        = {{PIN_DIAMETER}};     // captive pin diameter
+clearance    = {{CLEARANCE}};        // radial clearance between pin and free knuckles
+segments     = {{SEGMENTS}};         // cylinder facets ($fn)
+
+k_len = hinge_length / knuckles;     // length of a single knuckle
+z0    = -hinge_length/2;             // start position along Z
+
+epsilon = 0.05; // small expansion to avoid coplanar artifacts
+
+module knuckle_segment(zs, h, d_out, d_in) {
+    difference() {
+        translate([0,0,zs])
+            cylinder(h=h, d=d_out, center=false, $fn=segments);
+        // Bore slightly longer to ensure clean subtraction
+        translate([0,0,zs - epsilon])
+            cylinder(h=h + 2*epsilon, d=d_in, center=false, $fn=segments);
+    }
+}
+
+module hinge_core() {
+    union() {
+        // Captive pin runs full length; fuses with even-indexed knuckles
+        translate([0,0,z0])
+            cylinder(h=hinge_length, d=pin_d, center=false, $fn=segments);
+
+        // Alternating knuckles: even -> tight to pin; odd -> clearance to spin freely
+        for (i = [0:knuckles-1]) {
+            kn_z = z0 + i * k_len;
+            is_odd = (i % 2) == 1;
+            d_inner = is_odd ? (pin_d + clearance) : pin_d;
+            knuckle_segment(kn_z, k_len, outer_d, d_inner);
+        }
+    }
+}
+
+// Centered hinge about origin; axis along Z.
+hinge_core();

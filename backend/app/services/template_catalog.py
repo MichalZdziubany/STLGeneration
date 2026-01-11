@@ -31,15 +31,6 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["BASE_SIZE", "HEIGHT", "CENTERED"],
         "tags": ["Showcase", "Advanced"],
     },
-    "balanced_model_template.scad.j2": {
-        "id": "balanced_model",
-        "name": "Balanced Slicing Test",
-        "geometry": "Complex",
-        "dimensions": "Base 40-100 mm",
-        "description": "Comprehensive test model with overhangs, bridges, towers, and various features optimized for slicing validation.",
-        "parameters": ["BASE_SIZE", "OVERHANG_ANGLE", "BRIDGE_LENGTH", "WALL_THICKNESS", "TOWER_HEIGHT", "SEGMENTS"],
-        "tags": ["Testing", "Slicing", "Advanced"],
-    },
 }
 
 

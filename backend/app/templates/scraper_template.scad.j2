@@ -1,0 +1,40 @@
+//
+// SIMPLE SCRAPER TEMPLATE
+// Flat scraper with tapered edge and hanging hole.
+// Parameters are injected by backend.
+//
+
+len_x      = {{LENGTH}};           // overall length (X)
+width_y    = {{WIDTH}};            // overall width (Y)
+thick_z    = {{THICKNESS}};        // handle/body thickness (Z)
+taper_len  = {{TAPER_LENGTH}};     // length of tapered blade section (from tip)
+hole_d     = {{HANDLE_HOLE_DIAM}}; // hanging hole diameter
+segments   = {{SEGMENTS}};         // cylinder facets ($fn)
+
+epsilon = 0.01;
+
+// Wedge-shaped body via hull between thin tip and full-thickness handle
+module scraper_body() {
+    hull() {
+        // Thin blade tip region
+        translate([0, 0, 0])
+            cube([max(0.1, taper_len), width_y, 0.6], center=false);
+        // Full thickness handle region
+        translate([max(0.1, taper_len), 0, 0])
+            cube([max(0.1, len_x - taper_len), width_y, thick_z], center=false);
+    }
+}
+
+module hanging_hole() {
+    // Centered across width, near the handle end (10 mm from end or 1.5*hole_d if larger)
+    inset = max(10, 1.5*hole_d);
+    translate([len_x - inset, width_y/2, thick_z/2])
+        rotate([90, 0, 0])
+            cylinder(h=width_y + 2*epsilon, d=hole_d, center=true, $fn=segments);
+}
+
+// Final model
+ difference() {
+    scraper_body();
+    hanging_hole();
+ }

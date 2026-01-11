@@ -1,0 +1,66 @@
+//
+// PARAMETRIC LEGO BRICK (SIMPLIFIED)
+// Parameters are injected by backend.
+// Dimensions are approximate to standard LEGO system; tune tolerances for fit.
+//
+
+studs_x         = {{STUDS_X}};          // studs along X
+studs_y         = {{STUDS_Y}};          // studs along Y
+brick_h         = {{BRICK_HEIGHT}};     // total body height (e.g., 9.6 for brick, 3.2 for plate)
+pitch           = {{PITCH}};            // stud pitch (typically 8.0)
+wall_t          = {{WALL_THICKNESS}};   // outer wall thickness (~1.5)
+bottom_t        = {{BOTTOM_THICKNESS}}; // bottom floor thickness (~1.6)
+stud_d          = {{STUD_DIAMETER}};    // stud diameter (~4.8)
+stud_h          = {{STUD_HEIGHT}};      // stud height (~1.7)
+fit_tol         = {{TOLERANCE}};        // tolerance applied to studs (subtracts from diameter)
+include_tubes   = {{INCLUDE_TUBES}};    // bool: add underside tubes
+ tube_od        = {{TUBE_OUTER_DIAM}};  // underside tube outer diameter (~6.5 for bricks)
+ tube_id        = {{TUBE_INNER_DIAM}};  // underside tube inner diameter (~4.8 to 5.0)
+segments        = {{SEGMENTS}};         // cylinder facets ($fn)
+
+len_x = studs_x * pitch;
+len_y = studs_y * pitch;
+
+module body_shell() {
+    difference() {
+        // Outer shell
+        cube([len_x, len_y, brick_h], center=false);
+        // Hollow interior (leaving bottom and walls)
+        translate([wall_t, wall_t, bottom_t])
+            cube([len_x - 2*wall_t, len_y - 2*wall_t, brick_h - bottom_t], center=false);
+    }
+}
+
+module studs_top() {
+    for (ix = [0:studs_x-1])
+        for (iy = [0:studs_y-1]) {
+            cx = pitch/2 + ix * pitch;
+            cy = pitch/2 + iy * pitch;
+            translate([cx, cy, brick_h])
+                cylinder(h=stud_h, d=max(0.1, stud_d - fit_tol), center=false, $fn=segments);
+        }
+}
+
+module underside_tubes() {
+    if (include_tubes) {
+        // Place tubes on the internal grid (exclude perimeter). Height ends below the top
+        tube_h = brick_h - bottom_t - 0.6; // leave some ceiling
+        for (ix = [1:studs_x-1])
+            for (iy = [1:studs_y-1]) {
+                cx = ix * pitch;
+                cy = iy * pitch;
+                difference() {
+                    translate([cx, cy, bottom_t])
+                        cylinder(h=tube_h, d=tube_od, center=false, $fn=segments);
+                    translate([cx, cy, bottom_t - 0.05])
+                        cylinder(h=tube_h + 0.1, d=tube_id, center=false, $fn=segments);
+                }
+            }
+    }
+}
+
+union() {
+    body_shell();
+    studs_top();
+    underside_tubes();
+}
