@@ -1,34 +1,31 @@
 import uuid
 import subprocess
 import json
-import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-JOBS_DIR = Path("/app/jobs")
-SETTINGS_DIR = Path(__file__).resolve().parents[1] / "settings"
-
-# Resolve Cura resources root from environment, defaulting to /opt/cura-resources
-def _get_cura_resources_root() -> Path:
-    root = os.getenv("CURA_RESOURCES", "/opt/cura-resources")
-    return Path(root)
+from app.services.utils import (
+    JOBS_DIR,
+    SETTINGS_DIR,
+    get_cura_resources_root,
+    load_json,
+    normalize_values,
+)
 
 # Definitions live under resources/definitions in official Cura repo
-DEFINITIONS_DIR = _get_cura_resources_root() / "definitions"
+DEFINITIONS_DIR = get_cura_resources_root() / "definitions"
 # Extruders live under resources/extruders
-EXTRUDERS_DIR = _get_cura_resources_root() / "extruders"
+EXTRUDERS_DIR = get_cura_resources_root() / "extruders"
 # Quality profiles (inst.cfg) live under resources/quality
 # Note: CuraEngine expects JSON definition/resolved settings via -j/-r.
 #       .inst.cfg files are NOT JSON and cannot be passed to -j directly.
-QUALITY_DIR = _get_cura_resources_root() / "quality"
+QUALITY_DIR = get_cura_resources_root() / "quality"
+QUALITY_DIR = get_cura_resources_root() / "quality"
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    # Backward-compatible wrapper (use shared util)
+    return load_json(path)
 
 def _get_override_value(def_json: Dict[str, Any], name: str, default: Any) -> Any:
     """
@@ -129,28 +126,8 @@ def merge_settings(base_settings: Dict[str, Any], overrides: Dict[str, Any]) -> 
 
 
 def normalize_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize settings by removing None/empty values and converting booleans.
-    
-    Args:
-        settings: Raw settings dictionary
-        
-    Returns:
-        Normalized settings dictionary
-    """
-    normalized = {}
-    for key, value in settings.items():
-        # Skip None values
-        if value is None:
-            continue
-        # Skip empty strings
-        if isinstance(value, str) and value.strip() == "":
-            continue
-        # Convert booleans to lowercase strings
-        if isinstance(value, bool):
-            value = str(value).lower()
-        normalized[key] = value
-    return normalized
+    # Use shared normalizer
+    return normalize_values(settings, bool_to_lower=True, skip_none=True, skip_empty_str=True)
 
 
 def slice_stl_to_gcode(
@@ -264,7 +241,7 @@ def slice_stl_to_gcode(
         command.extend(["-s", f"{key}={safe_val}"])
     
     # Set environment variable for CuraEngine to find definitions, materials, quality profiles
-    resources_root = _get_cura_resources_root()
+    resources_root = get_cura_resources_root()
     env = {
         **subprocess.os.environ,
         "CURA_ENGINE_SEARCH_PATH": str(resources_root),

@@ -1,7 +1,6 @@
-from pathlib import Path
 from typing import Any, Dict, List
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
+from app.services.utils import TEMPLATES_DIR
 
 TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
     "cube_template.scad.j2": {
