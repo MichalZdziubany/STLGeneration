@@ -44,49 +44,6 @@ def _get_override_value(def_json: Dict[str, Any], name: str, default: Any) -> An
     return default
 
 
-def _compute_safe_start_gcode(printer_def_path: Path, final_settings: Dict[str, Any]) -> str:
-    """
-    Compute a bed-aware purge line sequence that stays within bounds
-    whether the printer uses center-zero or front-left origin.
-    """
-    def_json = _load_json(printer_def_path)
-
-    # Fallbacks if not explicitly overridden in machine definition
-    width = float(_get_override_value(def_json, "machine_width", 220))
-    depth = float(_get_override_value(def_json, "machine_depth", 220))
-
-    # Margins to keep purge inside the printable area
-    margin_x = 2.0
-    margin_y = 20.0
-
-    # Always assume front-left origin to avoid negative X on printers like Ender-3 V3 KE
-    x1 = margin_x
-    x2 = margin_x + 0.4
-    y_front = margin_y
-    y_back = depth - margin_y
-
-    # Use explicit first-layer temperature to avoid unresolved variables
-    first_layer_temp = int(final_settings.get("material_print_temperature_layer_0", 215))
-
-    start_gcode = (
-        "M220 S100 ;Reset Feedrate\n"
-        "M221 S100 ;Reset Flowrate\n\n"
-        "G28 ;Home\n\n"
-        "G92 E0 ;Reset Extruder\n"
-        "G1 Z2.0 F3000 ;Move Z Axis up\n"
-        f"G1 X{x1:.2f} Y{y_front:.2f} Z0.28 F5000.0 ;Move to start position (inside bed)\n"
-        f"M109 S{first_layer_temp} ;Heat to first-layer temp\n"
-        f"G1 X{x1:.2f} Y{y_back:.2f} Z0.28 F1500.0 E15 ;First purge line\n"
-        f"G1 X{x2:.2f} Y{y_back:.2f} Z0.28 F5000.0 ;Move to side a little\n"
-        f"G1 X{x2:.2f} Y{y_front:.2f} Z0.28 F1500.0 E30 ;Second purge line\n"
-        "G92 E0 ;Reset Extruder\n"
-        "G1 E-1 F1800 ;Retract a bit\n"
-        "G1 Z2.0 F3000 ;Move Z Axis up\n"
-        "G1 E0 F1800\n"
-    )
-    return start_gcode
-
-
 def load_settings_profile(profile_name: str = "balanced_profile") -> Dict[str, Any]:
     """
     Load a slicing settings profile from JSON file.
@@ -200,44 +157,19 @@ def slice_stl_to_gcode(
     
     # CuraEngine 5.12 introduces derived settings (e.g., roofing/flooring_*),
     # which are normally computed in the Cura frontend and provided via -r.
-    # To avoid zero-byte G-code when no resolved settings are provided, set minimal defaults.
+    # If your profiles already define these, you can remove these fallbacks.
     final_settings.setdefault("roofing_layer_count", 0)
     final_settings.setdefault("flooring_layer_count", 0)
-
-    # Remove brim/skirt unless explicitly requested by user
-    if "adhesion_type" not in user_overrides:
-        final_settings["adhesion_type"] = "none"
-    if "brim_line_count" not in user_overrides:
-        final_settings["brim_line_count"] = 0
-    if "skirt_line_count" not in user_overrides:
-        final_settings["skirt_line_count"] = 0
-
-    # Increase default speeds for a faster machine unless user specified
-    if "speed_infill" not in user_overrides:
-        final_settings["speed_infill"] = 120
-    if "speed_wall_0" not in user_overrides:
-        final_settings["speed_wall_0"] = 60
-    if "speed_wall_x" not in user_overrides:
-        final_settings["speed_wall_x"] = 120
-    if "speed_travel" not in user_overrides:
-        final_settings["speed_travel"] = 200
-
-    # Safe in-bed purge line; avoid unresolved variables from Cura frontend
-    final_settings.setdefault("material_print_temperature_layer_0", 215)
-    # Ensure front-left origin to prevent negative coordinates
-    if "machine_center_is_zero" not in user_overrides:
-        final_settings["machine_center_is_zero"] = False
-    # Force our safe start gcode unless the user explicitly provided one
-    if "machine_start_gcode" not in user_overrides:
-        final_settings["machine_start_gcode"] = _compute_safe_start_gcode(printer_def_path, final_settings)
 
     # Add settings overrides as -s parameters
     # The definition file provides all required defaults
     for key, value in final_settings.items():
-        if isinstance(value, str):
+        if isinstance(value, bool):
+            safe_val = str(value).lower()
+        elif isinstance(value, str):
             safe_val = value.replace("\n", "\\n")
         else:
-            safe_val = value
+            safe_val = str(value)
         command.extend(["-s", f"{key}={safe_val}"])
     
     # Set environment variable for CuraEngine to find definitions, materials, quality profiles
@@ -260,88 +192,23 @@ def slice_stl_to_gcode(
         if not gcode_path.exists():
             raise FileNotFoundError(f"G-code file not generated: {gcode_path}")
         
-        # Best-effort post-processing: fix start purge to be in-bounds and resolve temp
+        # Post-process: Replace temperature placeholder in start G-code
         try:
             with open(gcode_path, 'r', encoding='utf-8', errors='ignore') as f:
                 gcode_text = f.read()
-
-            # Load machine definition to get dimensions
-            def_json = _load_json(printer_def_path)
-            machine_depth = float(_get_override_value(def_json, 'machine_depth', 220))
-            temp0 = str(final_settings.get('material_print_temperature_layer_0', 215))
-
-            safe_start = (
-                "M220 S100 ;Reset Feedrate\n"
-                "M221 S100 ;Reset Flowrate\n\n"
-                "G28 ;Home\n\n"
-                "G92 E0 ;Reset Extruder\n"
-                "G1 Z2.0 F3000 ;Move Z Axis up\n"
-                "G1 X2.0 Y20 Z0.28 F5000.0 ;Move to start position (inside bed)\n"
-                f"M109 S{temp0} ;Heat to first-layer temp\n"
-                f"G1 X2.0 Y{max(20.0, machine_depth - 20.0):.1f} Z0.28 F1500.0 E15 ;First purge line\n"
-                f"G1 X2.4 Y{max(20.0, machine_depth - 20.0):.1f} Z0.28 F5000.0 ;Move to side a little\n"
-                "G1 X2.4 Y20 Z0.28 F1500.0 E30 ;Second purge line\n"
-                "G92 E0 ;Reset Extruder\n"
-                "G1 E-1 F1800 ;Retract a bit\n"
-                "G1 Z2.0 F3000 ;Move Z Axis up\n"
-                "G1 E0 F1800\n"
-            )
-
-            # Direct replacements to avoid pattern mismatch across Cura versions
-            new_text = gcode_text
-            y_back = f"{max(20.0, machine_depth - 20.0):.1f}"
-            new_text = new_text.replace(
-                "G1 X-2.0 Y20 Z0.28 F5000.0 ;Move to start position",
-                "G1 X2.0 Y20 Z0.28 F5000.0 ;Move to start position (inside bed)"
-            )
-            new_text = new_text.replace(
+            
+            temp = int(final_settings.get("material_print_temperature_layer_0", 200))
+            modified = gcode_text.replace(
                 "M109 S{material_print_temperature_layer_0}",
-                f"M109 S{temp0}"
+                f"M109 S{temp}"
             )
-            new_text = new_text.replace(
-                "G1 X-2.0 Y145.0 Z0.28 F1500.0 E15 ;Draw the first line",
-                f"G1 X2.0 Y{y_back} Z0.28 F1500.0 E15 ;First purge line"
-            )
-            new_text = new_text.replace(
-                "G1 X-1.7 Y145.0 Z0.28 F5000.0 ;Move to side a little",
-                f"G1 X2.4 Y{y_back} Z0.28 F5000.0 ;Move to side a little"
-            )
-            new_text = new_text.replace(
-                "G1 X-1.7 Y20 Z0.28 F1500.0 E30 ;Draw the second line",
-                "G1 X2.4 Y20 Z0.28 F1500.0 E30 ;Second purge line"
-            )
-
-            if new_text != gcode_text:
+            
+            if modified != gcode_text:
                 with open(gcode_path, 'w', encoding='utf-8') as f:
-                    f.write(new_text)
-
-            # Second pass: remove any SKIRT sections entirely if present
-            try:
-                lines = new_text.splitlines()
-                cleaned = []
-                in_skirt = False
-                for line in lines:
-                    if line.startswith(';TYPE:SKIRT'):
-                        in_skirt = True
-                        continue
-                    if in_skirt:
-                        # End skirt when next type or new layer begins
-                        if line.startswith(';TYPE:') or line.startswith(';LAYER:'):
-                            in_skirt = False
-                            cleaned.append(line)
-                        # Skip skirt line
-                        continue
-                    cleaned.append(line)
-                final_text = '\n'.join(cleaned)
-                if final_text != new_text:
-                    with open(gcode_path, 'w', encoding='utf-8') as f:
-                        f.write(final_text)
-            except Exception:
-                pass
+                    f.write(modified)
         except Exception:
-            # If anything goes wrong, return original file
             pass
-
+        
         return gcode_path
         
     except subprocess.CalledProcessError as e:
