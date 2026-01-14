@@ -33,7 +33,7 @@
 
 .navLinks a {
   text-decoration: none;
-  color: #333;
+  color: #000;
   font-size: 14px;
 }
 
@@ -42,9 +42,9 @@
 }
 
 .loginBtn {
-  padding: 8px 16px;
-  border: 1px solid #333;
-  border-radius: 20px;
+  text-decoration: none;
+  color: #000;
+  font-size: 14px;
 }
 
 /* ============= HERO SECTION ============= */
@@ -216,6 +216,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: var(--template-text);
 }
 
 .templateGeometry {
@@ -236,11 +237,12 @@
 .templateName {
   margin: 0;
   font-size: 20px;
+  color: #000;
 }
 
 .templateDescription {
   margin: 0;
-  color: #2e2e2e;
+  color: #000;
   line-height: 1.5;
 }
 
@@ -256,8 +258,9 @@
 .templateParams li {
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid #dcdcdc;
+  border: 1px solid var(--template-border);
   font-size: 12px;
+  color: var(--template-text);
 }
 
 .templateTagRow {
@@ -296,7 +299,7 @@
   padding: 20px 40px;
   display: flex;
   justify-content: space-between;
-  color: #555;
+  color: #000;
   font-size: 14px;
   background-color: white;
 }
@@ -308,7 +311,7 @@
 
 .footerLinks a {
   text-decoration: none;
-  color: #444;
+  color: #000;
 }
 
 .footerLinks a:hover {

@@ -30,6 +30,22 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["BASE_SIZE", "HEIGHT"],
         "tags": ["Showcase", "Advanced"],
     },
+    "scraper_template.scad.j2": {
+        "id": "scraper",
+        "name": "Flat Scraper",
+        "geometry": "Prismatic",
+        "dimensions": "Length/Width variable",
+        "description": "Flat scraper with tapered edge and optional hanging hole.",
+        "parameters": [
+            "LENGTH",
+            "WIDTH",
+            "THICKNESS",
+            "TAPER_LENGTH",
+            "HANDLE_HOLE_DIAM",
+            "SEGMENTS",
+        ],
+        "tags": ["Utility", "Print-in-place"],
+    },
 }
 
 

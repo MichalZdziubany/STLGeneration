@@ -18,6 +18,7 @@
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  color: #000;
 }
 
 .panelHeader {
@@ -81,5 +82,5 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #555;
+  color: #000;
 }

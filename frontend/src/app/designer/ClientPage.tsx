@@ -33,6 +33,8 @@ export default function ClientPage() {
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
   const [params, setParams] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
+  const [slicing, setSlicing] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string>("Ready");
 
   useEffect(() => {
     let alive = true;
@@ -86,12 +88,70 @@ export default function ClientPage() {
     setParams((prev) => ({ ...prev, [key]: value }));
   };
 
+  const onSlice = async () => {
+    if (!selected) return;
+    setSlicing(true);
+    setStatusMsg("Slicing to G-code…");
+    try {
+      const normalized: Record<string, string | number> = {};
+      Object.entries(params).forEach(([k, v]) => {
+        if (!v || v.trim() === "") return;
+        const n = Number(v);
+        normalized[k] = Number.isNaN(n) ? v : n;
+      });
+
+      const res = await fetch(`${apiBaseUrl}/slice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: selected.file ?? selected.id, params: normalized, slice_settings: null, profile: "balanced_profile" }),
+      });
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(selected.file ?? selected.id).replace('.scad.j2','')}-${Date.now()}.gcode`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setStatusMsg("G-code downloaded successfully.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to slice G-code";
+      setStatusMsg(msg);
+    } finally {
+      setSlicing(false);
+    }
+  };
+
   const onGenerate = async (e: FormEvent) => {
     e.preventDefault();
     if (!selected) return;
     setGenerating(true);
+    setStatusMsg("Generating STL…");
     try {
-      await new Promise((r) => setTimeout(r, 600));
+      const normalized: Record<string, string | number> = {};
+      Object.entries(params).forEach(([k, v]) => {
+        if (!v || v.trim() === "") return;
+        const n = Number(v);
+        normalized[k] = Number.isNaN(n) ? v : n;
+      });
+
+      const res = await fetch(`${apiBaseUrl}/generate-stl`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: selected.file ?? selected.id, params: normalized }),
+      });
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(selected.file ?? selected.id).replace('.scad.j2','')}-${Date.now()}.stl`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setStatusMsg("STL downloaded successfully.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to generate STL";
+      setStatusMsg(msg);
     } finally {
       setGenerating(false);
     }
@@ -121,7 +181,6 @@ export default function ClientPage() {
               <>
                 <div className={styles.panelHeader}>
                   <h3 className={styles.panelTitle}>{selected.name}</h3>
-                  <span className={landingStyles.templateFile}>{selected.file}</span>
                 </div>
                 <p className={landingStyles.templateDescription}>{selected.description}</p>
 
@@ -142,7 +201,10 @@ export default function ClientPage() {
 
                   <div className={styles.actions}>
                     <button type="submit" className={styles.primaryBtn} disabled={generating}>
-                      {generating ? "Generating…" : "Generate"}
+                      {generating ? "Generating…" : "Generate STL"}
+                    </button>
+                    <button type="button" className={styles.secondaryBtn} onClick={onSlice} disabled={slicing}>
+                      {slicing ? "Slicing…" : "Slice G-code"}
                     </button>
                     <Link href="/templates" className={styles.secondaryBtn}>Back to templates</Link>
                   </div>
@@ -156,7 +218,7 @@ export default function ClientPage() {
               <h3 className={styles.panelTitle}>3D Preview</h3>
             </div>
             <div className={styles.previewBox}>
-              <span>Model preview will appear here.</span>
+              <span>{statusMsg}</span>
             </div>
           </div>
         </div>

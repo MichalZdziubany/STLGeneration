@@ -76,7 +76,6 @@ export default function TemplatesPage() {
           <article key={`${t.id}-${t.file}`} className={styles.templateCard}>
             <div className={styles.templateHeader}>
               <span className={styles.templateGeometry}>{t.geometry}</span>
-              <span className={styles.templateFile}>{t.file}</span>
             </div>
             <h3 className={styles.templateName}>{t.name}</h3>
             <p className={styles.templateDescription}>{t.description}</p>

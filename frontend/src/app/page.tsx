@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./LandingPage.module.css";
 import Link from "next/link";
 
@@ -26,8 +26,6 @@ export default function Home() {
 
     return process.env.NEXT_PUBLIC_API_URL_BROWSER ?? serverDefault;
   }, []);
-  const [apiStatus, setApiStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [apiMessage, setApiMessage] = useState("Run the health check to verify connectivity.");
   const [templates, setTemplates] = useState<TemplateCard[]>([]);
   const [templateStatus, setTemplateStatus] = useState<"loading" | "ready" | "error">("loading");
   const [templateMessage, setTemplateMessage] = useState("Fetching templates...");
@@ -36,30 +34,7 @@ export default function Home() {
   const [generationStatus, setGenerationStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [generationMessage, setGenerationMessage] = useState("Pick a template to start generating.");
 
-  const pingBackend = useCallback(async () => {
-    setApiStatus("loading");
-    setApiMessage("Attempting to reach backend...");
 
-    try {
-      const response = await fetch(`${apiBaseUrl}/`);
-
-      if (!response.ok) {
-        throw new Error(`Backend returned ${response.status}`);
-      }
-
-      const payload = await response.json();
-      setApiMessage(payload.message ?? "Backend responded successfully.");
-      setApiStatus("success");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      setApiMessage(message);
-      setApiStatus("error");
-    }
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
-    pingBackend();
-  }, [pingBackend]);
 
   useEffect(() => {
     let isMounted = true;
@@ -192,19 +167,7 @@ export default function Home() {
     }
   };
 
-  const statusLabelMap = {
-    idle: "Idle",
-    loading: "Attempting",
-    success: "Connected",
-    error: "Unavailable",
-  } as const;
-
-  const statusToneClass = {
-    idle: styles.statusIdle,
-    loading: styles.statusLoading,
-    success: styles.statusSuccess,
-    error: styles.statusError,
-  }[apiStatus];
+ 
 
   return (
     <main className={styles.container}>
@@ -246,30 +209,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CONNECTIVITY STATUS */}
-      <section className={styles.statusPanel}>
-        <div className={styles.statusHeader}>
-          <div>
-            <p className={styles.statusKicker}>Connectivity</p>
-            <h3 className={styles.statusTitle}>Frontend → Backend status</h3>
-          </div>
-
-          <span className={`${styles.statusPill} ${statusToneClass}`}>
-            {statusLabelMap[apiStatus]}
-          </span>
-        </div>
-
-        <p className={styles.statusMessage}>{apiMessage}</p>
-
-        <button
-          type="button"
-          className={styles.statusButton}
-          onClick={pingBackend}
-          disabled={apiStatus === "loading"}
-        >
-          {apiStatus === "loading" ? "Checking..." : "Run Health Check"}
-        </button>
-      </section>
+ 
 
       {/* TEMPLATE GRID */}
       <section className={styles.templateGrid}>
@@ -284,11 +224,6 @@ export default function Home() {
         {templateStatus === "ready" &&
           templates.map((template: TemplateCard) => (
             <article key={template.id} className={styles.templateCard}>
-              <div className={styles.templateHeader}>
-                <span className={styles.templateGeometry}>{template.geometry}</span>
-                <span className={styles.templateFile}>{template.file}</span>
-              </div>
-
               <h3 className={styles.templateName}>{template.name}</h3>
               <p className={styles.templateDescription}>{template.description}</p>
 
@@ -310,7 +245,7 @@ export default function Home() {
                 </div>
               )}
 
-              <Link href={template.link ?? "/designer"} className={styles.templateCta}>
+              <Link href={`/designer?id=${encodeURIComponent(template.file)}`} className={styles.templateCta}>
                 Load Template →
               </Link>
             </article>
