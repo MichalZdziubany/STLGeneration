@@ -5,12 +5,11 @@
 
 height    = {{HEIGHT}};
 diameter  = {{DIAMETER}};
-centered  = {{CENTERED}};
 segments  = {{SEGMENTS}};   // number of cylinder facets
 
 cylinder(
     h = height,
     d = diameter,
-    center = centered,
+    center = false,
     $fn = segments
 );

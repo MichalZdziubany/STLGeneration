@@ -62,7 +62,7 @@ export default function ClientPage() {
   }, [apiBaseUrl]);
 
   const selected = useMemo(
-    () => templates.find((t) => t.id === selectedId) ?? null,
+    () => templates.find((t) => t.id === selectedId || t.file === selectedId) ?? null,
     [templates, selectedId]
   );
 
@@ -73,9 +73,11 @@ export default function ClientPage() {
     }
     setParams((prev) => {
       const next: Record<string, string> = {};
-      (selected.parameters ?? []).forEach((p) => {
-        next[p] = prev[p] ?? "";
-      });
+      (selected.parameters ?? [])
+        .filter((p) => p.toUpperCase() !== "CENTERED")
+        .forEach((p) => {
+          next[p] = prev[p] ?? "";
+        });
       return next;
     });
   }, [selected]);
@@ -124,17 +126,19 @@ export default function ClientPage() {
                 <p className={landingStyles.templateDescription}>{selected.description}</p>
 
                 <form className={styles.paramForm} onSubmit={onGenerate}>
-                  {(selected.parameters ?? []).map((p) => (
-                    <div key={p} className={styles.formRow}>
-                      <label>{p}</label>
-                      <input
-                        className={styles.input}
-                        value={params[p] ?? ""}
-                        onChange={(e) => onParamChange(p, e.target.value)}
-                        placeholder={`Enter ${p}`}
-                      />
-                    </div>
-                  ))}
+                  {(selected.parameters ?? [])
+                    .filter((p) => p.toUpperCase() !== "CENTERED")
+                    .map((p) => (
+                      <div key={p} className={styles.formRow}>
+                        <label>{p}</label>
+                        <input
+                          className={styles.input}
+                          value={params[p] ?? ""}
+                          onChange={(e) => onParamChange(p, e.target.value)}
+                          placeholder={`Enter ${p}`}
+                        />
+                      </div>
+                    ))}
 
                   <div className={styles.actions}>
                     <button type="submit" className={styles.primaryBtn} disabled={generating}>

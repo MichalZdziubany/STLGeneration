@@ -5,6 +5,6 @@
 //
 
 cube_size = {{CUBE_SIZE}};
-centered  = {{CENTERED}};
 
-cube([cube_size, cube_size, cube_size], center = centered);
+// Non-centered cube placed in positive coordinates
+cube([cube_size, cube_size, cube_size], center = false);

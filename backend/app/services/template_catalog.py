@@ -9,7 +9,7 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "geometry": "Cube",
         "dimensions": "Edge 20-150 mm",
         "description": "Dial precise cube dimensions, add chamfers, and export calibration blocks instantly.",
-        "parameters": ["CUBE_SIZE", "CENTERED"],
+        "parameters": ["CUBE_SIZE"],
         "tags": ["Beginner", "Stable"],
     },
     "cylinder_template.scad.j2": {
@@ -27,7 +27,7 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "geometry": "Pyramid",
         "dimensions": "Base 25-200 mm",
         "description": "Architectural studies with tunable base sizes and apex heights for quick demos.",
-        "parameters": ["BASE_SIZE", "HEIGHT", "CENTERED"],
+        "parameters": ["BASE_SIZE", "HEIGHT"],
         "tags": ["Showcase", "Advanced"],
     },
 }
