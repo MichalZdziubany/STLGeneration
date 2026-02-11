@@ -1,75 +1,59 @@
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
+  User,
+} from "firebase/auth";
+import { auth } from "./firebase";
+
 export type AuthUser = {
   uid: string;
   email: string | null;
   displayName?: string | null;
 };
 
-const useMock = (process.env.NEXT_PUBLIC_AUTH_MOCK ?? "true").toLowerCase() === "true";
-
-function makeMockUser(email: string): AuthUser {
+function toAuthUser(user: User): AuthUser {
   return {
-    uid: `mock-${Math.random().toString(36).slice(2)}`,
-    email,
-    displayName: email.split("@")[0],
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
   };
 }
 
-export async function signInWithEmail(email: string, _password: string): Promise<AuthUser> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 500));
-    return makeMockUser(email);
-  }
-  throw new Error(
-    "Auth not configured. Replace functions in src/lib/auth.ts with Firebase Auth (signInWithEmailAndPassword)."
-  );
+export async function signInWithEmail(email: string, password: string): Promise<AuthUser> {
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  return toAuthUser(credential.user);
 }
 
 export async function signInWithGoogle(): Promise<AuthUser> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 500));
-    return makeMockUser("mock.user@example.com");
-  }
-  throw new Error(
-    "Auth not configured. Replace functions in src/lib/auth.ts with Firebase Auth (signInWithPopup/redirect with GoogleAuthProvider)."
-  );
+  const provider = new GoogleAuthProvider();
+  const credential = await signInWithPopup(auth, provider);
+  return toAuthUser(credential.user);
 }
 
 export async function signOut(): Promise<void> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 250));
-    return;
-  }
-  throw new Error(
-    "Auth not configured. Replace function in src/lib/auth.ts with Firebase Auth signOut()."
-  );
+  await firebaseSignOut(auth);
 }
 
-export async function signUpWithEmail(email: string, _password: string): Promise<AuthUser> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 600));
-    return makeMockUser(email);
+export async function signUpWithEmail(email: string, password: string): Promise<AuthUser> {
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  return toAuthUser(credential.user);
   }
   throw new Error(
     "Auth not configured. Replace with Firebase Auth createUserWithEmailAndPassword."
   );
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 600));
-    return;
-  }
-  throw new Error(
-    "Auth not configured. Replace with Firebase Auth sendPasswordResetEmail."
-  );
 }
 
-export async function resetPasswordWithCode(_code: string, _newPassword: string): Promise<void> {
-  if (useMock) {
-    await new Promise((r) => setTimeout(r, 600));
-    return;
-  }
-  throw new Error(
-    "Auth not configured. Replace with Firebase Auth confirmPasswordReset."
-  );
+export async function requestPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
+}
+
+export async function resetPasswordWithCode(code: string, newPassword: string): Promise<void> {
+  await confirmPasswordReset(auth, code, newPassword);
 }
