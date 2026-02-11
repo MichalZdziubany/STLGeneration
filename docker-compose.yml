@@ -5,10 +5,6 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/jobs:/app/jobs
-    depends_on:
-      - openscad
-      - curaengine
-      
 
   frontend:
     build: ./frontend
@@ -20,12 +16,3 @@ services:
     depends_on:
       - backend
 
-  openscad:
-    build: ./docker/openscad-service
-    volumes:
-      - ./backend/jobs:/data
-  curaengine:
-    build: ./docker/curaengine-service
-    volumes:
-      - ./backend/jobs:/data
-  

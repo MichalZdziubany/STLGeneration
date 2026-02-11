@@ -46,9 +46,7 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   throw new Error(
     "Auth not configured. Replace with Firebase Auth createUserWithEmailAndPassword."
   );
-}
 
-}
 
 export async function requestPasswordReset(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email);
