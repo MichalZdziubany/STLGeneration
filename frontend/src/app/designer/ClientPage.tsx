@@ -88,6 +88,15 @@ export default function ClientPage() {
     setParams((prev) => ({ ...prev, [key]: value }));
   };
 
+  const getSliderConfig = (value: string) => {
+    const trimmed = value.trim();
+    const parsed = Number(trimmed);
+    const hasNumber = trimmed !== "" && !Number.isNaN(parsed);
+    const step = trimmed.includes(".") ? 0.1 : 1;
+    const clamped = hasNumber ? Math.min(Math.max(parsed, 0), 200) : 0;
+    return { min: 0, max: 200, step, value: clamped, enabled: true };
+  };
+
   const onSlice = async () => {
     if (!selected) return;
     setSlicing(true);
@@ -190,12 +199,30 @@ export default function ClientPage() {
                     .map((p) => (
                       <div key={p} className={styles.formRow}>
                         <label>{p}</label>
-                        <input
-                          className={styles.input}
-                          value={params[p] ?? ""}
-                          onChange={(e) => onParamChange(p, e.target.value)}
-                          placeholder={`Enter ${p}`}
-                        />
+                        {(() => {
+                          const cfg = getSliderConfig(params[p] ?? "");
+                          return (
+                            <div className={styles.paramControls}>
+                              <input
+                                type="number"
+                                className={styles.input}
+                                value={params[p] ?? ""}
+                                onChange={(e) => onParamChange(p, e.target.value)}
+                                placeholder={`Enter ${p}`}
+                              />
+                              <input
+                                type="range"
+                                className={styles.slider}
+                                min={cfg.min}
+                                max={cfg.max}
+                                step={cfg.step}
+                                value={cfg.value}
+                                disabled={!cfg.enabled}
+                                onChange={(e) => onParamChange(p, e.target.value)}
+                              />
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
 

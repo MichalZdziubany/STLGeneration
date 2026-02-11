@@ -46,10 +46,21 @@
   gap: 6px;
 }
 
+.paramControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .input {
   border: 1px solid #dcdcdc;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 6px 8px;
+  width: 120px;
+}
+
+.slider {
+  flex: 1;
 }
 
 .actions {
