@@ -42,11 +42,7 @@ export async function signOut(): Promise<void> {
 export async function signUpWithEmail(email: string, password: string): Promise<AuthUser> {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   return toAuthUser(credential.user);
-  }
-  throw new Error(
-    "Auth not configured. Replace with Firebase Auth createUserWithEmailAndPassword."
-  );
-
+}
 
 export async function requestPasswordReset(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email);
