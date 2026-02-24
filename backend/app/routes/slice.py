@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Header
 from pydantic import BaseModel, Field
 
 from app.services.slicer import (
@@ -10,11 +10,12 @@ from app.services.slicer import (
     get_profile_settings
 )
 from app.services.template_catalog import get_template_metadata
+from app.services.user_template_generator import generate_stl_from_scad_code, validate_scad_code
 from pathlib import Path
 
 
 class SliceRequest(BaseModel):
-    template_id: str = Field(..., description="Template identifier or file name")
+    template_id: Optional[str] = Field(None, description="Template identifier or file name")
     params: Dict[str, Any] = Field(default_factory=dict, description="Template parameters")
     slice_settings: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -24,6 +25,8 @@ class SliceRequest(BaseModel):
         default="balanced_profile",
         description="Settings profile to use (default: balanced_profile)"
     )
+    user_id: Optional[str] = Field(None, description="User ID for user templates")
+    scad_code: Optional[str] = Field(None, description="Pre-generated SCAD code (from user template execution)")
 
 
 class SliceSTLRequest(BaseModel):
@@ -42,13 +45,51 @@ router = APIRouter()
 
 
 @router.post("/slice")
-def route_slice_model(payload: SliceRequest):
+def route_slice_model(
+    payload: SliceRequest,
+    user_id: Optional[str] = Header(None),
+):
     """
-    Generate an STL from a template and slice it to G-code using a settings profile.
-    Returns the G-code file.
+    Generate G-code from either built-in template or pre-generated SCAD code.
     """
+    
+    # Use user_id from header if not in payload
+    final_user_id = payload.user_id or user_id
+    
+    # If SCAD code is provided, use it directly
+    if payload.scad_code:
+        # Validate SCAD code
+        is_valid, validation_msg = validate_scad_code(payload.scad_code)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Invalid SCAD code: {validation_msg}")
+        
+        # Generate STL from SCAD code
+        stl_path = generate_stl_from_scad_code(payload.scad_code, payload.params)
+        if not stl_path or not stl_path.exists():
+            raise HTTPException(status_code=500, detail="Failed to generate STL from SCAD code")
+        
+        # Then slice the STL to G-code
+        try:
+            gcode_path = slice_stl_to_gcode(
+                stl_path,
+                payload.slice_settings,
+                payload.profile
+            )
+            return Response(
+                content=gcode_path.read_bytes(),
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{gcode_path.name}"'
+                }
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
+    
+    # Otherwise use template_id (built-in templates)
+    if not payload.template_id:
+        raise HTTPException(status_code=400, detail="Either template_id or scad_code is required")
+    
     template = get_template_metadata(payload.template_id)
-
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
