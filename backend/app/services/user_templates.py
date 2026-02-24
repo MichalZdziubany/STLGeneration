@@ -39,9 +39,9 @@ def save_user_template(
     template_dir = user_dir / template_id
     template_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save the JS file
-    js_file_path = template_dir / "template.js"
-    js_file_path.write_text(js_content, encoding="utf-8")
+    # Save the template file as .scad.j2
+    template_file_path = template_dir / "template.scad.j2"
+    template_file_path.write_text(js_content, encoding="utf-8")
     
     # Create and save metadata
     metadata = {
@@ -54,7 +54,7 @@ def save_user_template(
         "tags": tags,
         "createdAt": datetime.utcnow().isoformat(),
         "updatedAt": datetime.utcnow().isoformat(),
-        "file": "template.js",
+        "file": "template.scad.j2",
     }
     
     metadata_path = template_dir / "metadata.json"
@@ -77,6 +77,11 @@ def get_user_templates(user_id: str) -> List[Dict[str, Any]]:
                 try:
                     with open(metadata_path, "r") as f:
                         metadata = json.load(f)
+                        # Normalize parameters to match built-in template format
+                        # Convert from [{"name": "x", "type": "number", ...}] to ["x", "y", "z"]
+                        if "parameters" in metadata and isinstance(metadata["parameters"], list):
+                            if metadata["parameters"] and isinstance(metadata["parameters"][0], dict):
+                                metadata["parameters"] = [p["name"] for p in metadata["parameters"]]
                         templates.append(metadata)
                 except Exception:
                     pass
@@ -101,6 +106,10 @@ def get_public_templates() -> List[Dict[str, Any]]:
                             with open(metadata_path, "r") as f:
                                 metadata = json.load(f)
                                 if metadata.get("isPublic", False):
+                                    # Normalize parameters to match built-in template format
+                                    if "parameters" in metadata and isinstance(metadata["parameters"], list):
+                                        if metadata["parameters"] and isinstance(metadata["parameters"][0], dict):
+                                            metadata["parameters"] = [p["name"] for p in metadata["parameters"]]
                                     public_templates.append(metadata)
                         except Exception:
                             pass
@@ -109,12 +118,12 @@ def get_public_templates() -> List[Dict[str, Any]]:
 
 
 def get_template_content(user_id: str, template_id: str) -> Optional[str]:
-    """Get the JS file content for a user template."""
+    """Get the template file content for a user template."""
     template_dir = USER_TEMPLATES_DIR / user_id / template_id
-    js_file = template_dir / "template.js"
+    template_file = template_dir / "template.scad.j2"
     
-    if js_file.exists():
-        return js_file.read_text(encoding="utf-8")
+    if template_file.exists():
+        return template_file.read_text(encoding="utf-8")
     
     return None
 
@@ -159,6 +168,11 @@ def update_template_metadata(
         
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
+        
+        # Normalize parameters before returning
+        if "parameters" in metadata and isinstance(metadata["parameters"], list):
+            if metadata["parameters"] and isinstance(metadata["parameters"][0], dict):
+                metadata["parameters"] = [p["name"] for p in metadata["parameters"]]
         
         return metadata
     except Exception:

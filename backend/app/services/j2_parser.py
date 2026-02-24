@@ -6,24 +6,29 @@ def extract_parameters_from_js(template_content: str) -> List[Dict[str, Any]]:
     """
     Extract parameters from Jinja2 template file (.scad.j2).
     
-    Looks for parameter declarations in the format:
-    {# @param paramName {type} description #}
-    {% set paramName = defaultValue %}
+    Supports multiple formats:
+    1. Explicit @param comments:
+       {# @param paramName {type} description #}
+       {% set paramName = defaultValue %}
     
-    Or inline format:
-    {% set paramName = defaultValue %} {# description #}
+    2. Jinja2 variable placeholders:
+       variableName = {{PARAMETER_NAME}};
+    
+    3. {% set %} statements:
+       {% set paramName = defaultValue %}
     
     Returns list of parameter objects with name, type, description, and default value.
     """
     parameters: List[Dict[str, Any]] = []
+    param_names_seen = set()
     lines = template_content.split('\n')
     
     i = 0
     while i < len(lines):
         line = lines[i].strip()
         
-        # Look for Jinja2 comment lines with @param
-        # Pattern: {# @param paramName {type} description #}
+        # Pattern 1: Look for Jinja2 comment lines with @param
+        # {# @param paramName {type} description #}
         param_comment_pattern = r'\{#\s*@param\s+(\w+)\s*(?:\{(\w+)\})?\s*(.*?)\s*#\}'
         comment_match = re.search(param_comment_pattern, line)
         
@@ -32,32 +37,65 @@ def extract_parameters_from_js(template_content: str) -> List[Dict[str, Any]]:
             param_type = comment_match.group(2) or "number"
             param_description = comment_match.group(3) or ""
             
-            # Look for {% set %} statement in next few lines
-            default_value = None
-            j = i
-            while j < len(lines) and j < i + 5:
-                next_line = lines[j].strip()
-                set_pattern = r'\{%\s*set\s+' + re.escape(param_name) + r'\s*=\s*([^%]+)\s*%\}'
-                set_match = re.search(set_pattern, next_line)
-                if set_match:
-                    default_value_str = set_match.group(1).strip()
-                    default_value = parse_default_value(default_value_str)
-                    break
-                j += 1
-            
-            # If no default found, use type-appropriate default
-            if default_value is None:
-                default_value = get_default_for_type(param_type)
-            
-            parameters.append({
-                "name": param_name,
-                "type": param_type,
-                "description": param_description.strip(),
-                "default": default_value
-            })
+            if param_name not in param_names_seen:
+                # Look for {% set %} statement in next few lines
+                default_value = None
+                j = i
+                while j < len(lines) and j < i + 5:
+                    next_line = lines[j].strip()
+                    set_pattern = r'\{%\s*set\s+' + re.escape(param_name) + r'\s*=\s*([^%]+)\s*%\}'
+                    set_match = re.search(set_pattern, next_line)
+                    if set_match:
+                        default_value_str = set_match.group(1).strip()
+                        default_value = parse_default_value(default_value_str)
+                        break
+                    j += 1
+                
+                # If no default found, use type-appropriate default
+                if default_value is None:
+                    default_value = get_default_for_type(param_type)
+                
+                parameters.append({
+                    "name": param_name,
+                    "type": param_type,
+                    "description": param_description.strip(),
+                    "default": default_value
+                })
+                param_names_seen.add(param_name)
         
-        # Also look for standalone {% set %} statements with inline comments
-        # Pattern: {% set paramName = value %} {# description #}
+        # Pattern 2: Look for variable assignments with Jinja2 placeholders
+        # variableName = {{PARAMETER_NAME}};
+        jinja_var_pattern = r'(\w+)\s*=\s*\{\{(\w+)\}\}\s*;'
+        jinja_match = re.search(jinja_var_pattern, line)
+        
+        if jinja_match:
+            local_var = jinja_match.group(1)  # e.g., "height"
+            param_name = jinja_match.group(2)  # e.g., "HEIGHT"
+            
+            if param_name not in param_names_seen:
+                # Look for comment before or on same line
+                description = ""
+                comment_pattern = r'//\s*(.*?)$'
+                comment_match = re.search(comment_pattern, line)
+                if comment_match:
+                    description = comment_match.group(1).strip()
+                else:
+                    # Check previous line for comment
+                    if i > 0:
+                        prev_line = lines[i - 1].strip()
+                        if prev_line.startswith('//'):
+                            description = prev_line[2:].strip()
+                
+                parameters.append({
+                    "name": param_name,
+                    "type": "number",  # Default type for Jinja2 placeholders
+                    "description": description or f"{local_var} parameter",
+                    "default": 10  # Default value
+                })
+                param_names_seen.add(param_name)
+        
+        # Pattern 3: Standalone {% set %} statements with inline comments
+        # {% set paramName = value %} {# description #}
         set_pattern = r'\{%\s*set\s+(\w+)\s*=\s*([^%]+)\s*%\}'
         set_match = re.search(set_pattern, line)
         
@@ -65,8 +103,7 @@ def extract_parameters_from_js(template_content: str) -> List[Dict[str, Any]]:
             param_name = set_match.group(1)
             default_value_str = set_match.group(2).strip()
             
-            # Check if we already have this parameter
-            if not any(p['name'] == param_name for p in parameters):
+            if param_name not in param_names_seen:
                 # Look for inline comment
                 inline_comment_pattern = r'\{#\s*(.*?)\s*#\}'
                 comment_match = re.search(inline_comment_pattern, line)
@@ -82,6 +119,7 @@ def extract_parameters_from_js(template_content: str) -> List[Dict[str, Any]]:
                         "description": description.strip(),
                         "default": default_value
                     })
+                    param_names_seen.add(param_name)
         
         i += 1
     

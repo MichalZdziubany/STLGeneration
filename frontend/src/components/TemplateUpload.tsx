@@ -25,12 +25,12 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
 
   const extractParametersFromTemplate = (templateContent: string): ExtractedParameter[] => {
     const parameters: ExtractedParameter[] = [];
+    const paramNamesSeen = new Set<string>();
     const lines = templateContent.split("\n");
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Look for Jinja2 variable declarations or comments
       // Pattern 1: {# @param paramName {type} description #}
       let paramMatch = line.match(/\{#\s*@param\s+(\w+)\s*(?:\{(\w+)\})?\s*(.*)?\s*#\}/);
       
@@ -39,38 +39,69 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
         const paramType = paramMatch[2] || "number";
         const paramDescription = paramMatch[3] || "";
         
-        // Look for default value in next few lines
-        let defaultValue: any = 0;
-        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-          const varLine = lines[j].trim();
-          // Check for Jinja2 set statement: {% set paramName = value %}
-          const setMatch = varLine.match(
-            new RegExp(`\\{%\\s*set\\s+${paramName}\\s*=\\s*([^%]+)\\s*%\\}`, 'i')
-          );
-          
-          if (setMatch) {
-            const defaultStr = setMatch[1].trim();
-            // Parse default value
-            if (defaultStr.toLowerCase() === "true") defaultValue = true;
-            else if (defaultStr.toLowerCase() === "false") defaultValue = false;
-            else if (!isNaN(Number(defaultStr))) {
-              defaultValue = parseFloat(defaultStr);
-            } else if (
-              (defaultStr.startsWith('"') && defaultStr.endsWith('"')) ||
-              (defaultStr.startsWith("'") && defaultStr.endsWith("'"))
-            ) {
-              defaultValue = defaultStr.slice(1, -1);
+        if (!paramNamesSeen.has(paramName)) {
+          // Look for default value in next few lines
+          let defaultValue: any = 0;
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const varLine = lines[j].trim();
+            const setMatch = varLine.match(
+              new RegExp(`\\{%\\s*set\\s+${paramName}\\s*=\\s*([^%]+)\\s*%\\}`, 'i')
+            );
+            
+            if (setMatch) {
+              const defaultStr = setMatch[1].trim();
+              if (defaultStr.toLowerCase() === "true") defaultValue = true;
+              else if (defaultStr.toLowerCase() === "false") defaultValue = false;
+              else if (!isNaN(Number(defaultStr))) {
+                defaultValue = parseFloat(defaultStr);
+              } else if (
+                (defaultStr.startsWith('"') && defaultStr.endsWith('"')) ||
+                (defaultStr.startsWith("'") && defaultStr.endsWith("'"))
+              ) {
+                defaultValue = defaultStr.slice(1, -1);
+              }
+              break;
             }
-            break;
           }
+          
+          parameters.push({
+            name: paramName,
+            type: paramType,
+            description: paramDescription,
+            default: defaultValue,
+          });
+          paramNamesSeen.add(paramName);
         }
+      }
+      
+      // Pattern 2: variableName = {{PARAMETER_NAME}};
+      const jinjaVarMatch = line.match(/(\w+)\s*=\s*\{\{(\w+)\}\}\s*;/);
+      
+      if (jinjaVarMatch) {
+        const localVar = jinjaVarMatch[1];  // e.g., "height"
+        const paramName = jinjaVarMatch[2];  // e.g., "HEIGHT"
         
-        parameters.push({
-          name: paramName,
-          type: paramType,
-          description: paramDescription,
-          default: defaultValue,
-        });
+        if (!paramNamesSeen.has(paramName)) {
+          // Look for comment on same line or previous line
+          let description = "";
+          const commentMatch = line.match(/\/\/\s*(.*)$/);
+          if (commentMatch) {
+            description = commentMatch[1].trim();
+          } else if (i > 0) {
+            const prevLine = lines[i - 1].trim();
+            if (prevLine.startsWith("//")) {
+              description = prevLine.substring(2).trim();
+            }
+          }
+          
+          parameters.push({
+            name: paramName,
+            type: "number",
+            description: description || `${localVar} parameter`,
+            default: 10,
+          });
+          paramNamesSeen.add(paramName);
+        }
       }
     }
     
