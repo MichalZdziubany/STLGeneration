@@ -25,7 +25,7 @@ export default function ContactPage() {
         <nav className={landingStyles.navLinks}>
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>
-          <Link href="/downloads">Downloads</Link>
+          <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
           <Link href="/login" className={landingStyles.loginBtn}>Log In / Sign In</Link>
         </nav>

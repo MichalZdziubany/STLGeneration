@@ -178,7 +178,7 @@ export default function Home() {
         <nav className={styles.navLinks}>
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>
-          <Link href="/downloads">Downloads</Link>
+          <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
 
           <Link href="/login" className={styles.loginBtn}>
