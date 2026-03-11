@@ -9,11 +9,13 @@ import AuthNavLink from "@/components/AuthNavLink";
 import { auth } from "@/lib/firebase";
 import {
   DEFAULT_USER_PROFILE_SETTINGS,
-  getUserProfileSettings,
-  saveUserProfileSettings,
   deleteUserProfileSettings,
   UserProfileSettings,
 } from "@/lib/firestore";
+import {
+  loadEffectiveUserProfileSettings,
+  saveEffectiveUserProfileSettings,
+} from "@/lib/profile-settings";
 import landingStyles from "../LandingPage.module.css";
 import styles from "./ProfilePage.module.css";
 
@@ -43,7 +45,7 @@ export default function ProfilePage() {
     const load = async () => {
       setStatus("Loading profile settings...");
       try {
-        const settings = await getUserProfileSettings(user.uid);
+        const settings = await loadEffectiveUserProfileSettings(user.uid);
         if (!alive) return;
         setPrinter(settings.printer);
         setPrintWidth(String(settings.printWidth));
@@ -86,13 +88,17 @@ export default function ProfilePage() {
     setSaving(true);
     setStatus("Saving settings...");
     try {
-      await saveUserProfileSettings(user.uid, {
+      const persistedTo = await saveEffectiveUserProfileSettings(user.uid, {
         printer,
         printWidth: width,
         printHeight: height,
         printLength: length,
       });
-      setStatus("Settings saved.");
+      if (persistedTo === "firestore") {
+        setStatus("Settings saved.");
+      } else {
+        setStatus("Settings saved locally in this browser (Firestore permissions blocked).");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save settings";
       setStatus(msg);

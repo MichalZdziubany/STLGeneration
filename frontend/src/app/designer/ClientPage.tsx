@@ -6,7 +6,7 @@ import Link from "next/link";
 import StlPreview from "@/components/StlPreview";
 import AuthNavLink from "@/components/AuthNavLink";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserProfileSettings } from "@/lib/firestore";
+import { loadEffectiveUserProfileSettings } from "@/lib/profile-settings";
 import landingStyles from "../LandingPage.module.css";
 import styles from "../DesignerPage.module.css";
 
@@ -111,7 +111,7 @@ export default function ClientPage() {
       }
 
       try {
-        const profile = await getUserProfileSettings(user.uid);
+        const profile = await loadEffectiveUserProfileSettings(user.uid);
         if (!alive) return;
         const maxDim = Math.max(profile.printWidth, profile.printHeight, profile.printLength, 1);
         setSliderMax(maxDim);
