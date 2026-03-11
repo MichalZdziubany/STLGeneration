@@ -96,9 +96,9 @@ export default function UploadPage() {
               <li>Upload the file with metadata</li>
               <li>Make it public to share with others</li>
             </ol>
-            <a href="/EXAMPLE_TEMPLATES.md" target="_blank" rel="noopener noreferrer" className={styles.docsLink}>
-              View Example Templates →
-            </a>
+            <Link href="/example-templates" className={styles.docsLink}>
+              View Example Templates -&gt;
+            </Link>
           </div>
         </div>
       </section>
