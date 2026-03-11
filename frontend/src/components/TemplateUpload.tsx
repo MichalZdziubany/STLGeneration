@@ -226,8 +226,8 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
 
   if (!user) {
     return (
-      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-6 text-center">
-        <p className="text-neutral-600 dark:text-neutral-400">
+      <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-black">
+        <p className="text-neutral-700">
           Please log in to upload templates
         </p>
       </div>
@@ -235,7 +235,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-6">
+    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-black">
       <h2 className="text-xl font-semibold mb-4">Upload Template</h2>
       
       {message && (
@@ -260,7 +260,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
             type="text"
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-black outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="My Custom Template"
             required
           />
@@ -274,7 +274,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-black outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Describe your template..."
             rows={3}
           />
@@ -289,7 +289,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
             type="file"
             accept=".scad.j2"
             onChange={handleFileChange}
-            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-black outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
           <p className="text-xs text-neutral-500 mt-1">
@@ -306,7 +306,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
             type="text"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-black outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="e.g., geometric, parametric, cube"
           />
         </div>
@@ -317,7 +317,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
             type="checkbox"
             checked={isPublic}
             onChange={(e) => setIsPublic(e.target.checked)}
-            className="rounded border-neutral-300 dark:border-neutral-700"
+            className="rounded border-neutral-300"
           />
           <label htmlFor="is-public" className="text-sm font-medium">
             Make template public (others can view and use)
@@ -325,19 +325,19 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
         </div>
 
         {showPreview && parameters.length > 0 && (
-          <div className="rounded-md bg-neutral-50 dark:bg-neutral-900/30 p-4 border border-neutral-200 dark:border-neutral-800">
+          <div className="rounded-md bg-neutral-50 p-4 border border-neutral-200 text-black">
             <p className="text-sm font-medium mb-2">Detected Parameters:</p>
             <div className="space-y-2">
               {parameters.map((param) => (
                 <div key={param.name} className="text-xs">
-                  <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                  <span className="font-mono font-semibold text-blue-600">
                     {param.name}
                   </span>
                   <span className="text-neutral-500 ml-2">
                     ({param.type})
                   </span>
                   {param.description && (
-                    <span className="text-neutral-600 dark:text-neutral-400 ml-2">
+                    <span className="text-neutral-700 ml-2">
                       - {param.description}
                     </span>
                   )}
