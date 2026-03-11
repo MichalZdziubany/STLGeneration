@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./LandingPage.module.css";
 import Link from "next/link";
+import AuthNavLink from "@/components/AuthNavLink";
 
 type TemplateCard = {
   id: string;
@@ -181,9 +182,7 @@ export default function Home() {
           <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
 
-          <Link href="/login" className={styles.loginBtn}>
-            Log In / Sign In
-          </Link>
+          <AuthNavLink className={styles.loginBtn} />
         </nav>
       </header>
 

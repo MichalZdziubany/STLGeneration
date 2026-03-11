@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AuthNavLink from '@/components/AuthNavLink';
 import TemplateUpload from '@/components/TemplateUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import styles from './UploadPage.module.css';
@@ -30,9 +31,7 @@ export default function UploadPage() {
             <Link href="/templates">Templates</Link>
             <Link href="/upload">Upload</Link>
             <Link href="/about">About</Link>
-            <Link href="/login" className={landingStyles.loginBtn}>
-              Log In / Sign In
-            </Link>
+            <AuthNavLink className={landingStyles.loginBtn} />
           </nav>
         </header>
         <section className={styles.uploadWrapper}>
@@ -57,9 +56,7 @@ export default function UploadPage() {
           <Link href="/templates">Templates</Link>
           <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
-          <Link href="/login" className={landingStyles.loginBtn}>
-            Log In / Sign In
-          </Link>
+          <AuthNavLink className={landingStyles.loginBtn} />
         </nav>
       </header>
 

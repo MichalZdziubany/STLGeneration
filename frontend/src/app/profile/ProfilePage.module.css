@@ -1,0 +1,110 @@
+.wrap {
+  max-width: 920px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  padding: 1.5rem;
+  color: #111;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 1.7rem;
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: #444;
+}
+
+.emailRow {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.row label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.input,
+.select {
+  border: 1px solid #cfcfcf;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  padding: 0.55rem 0.7rem;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.hint {
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.actions {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  border: none;
+  background: #111;
+  color: #fff;
+}
+
+.secondaryBtn {
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+}
+
+.dangerBtn {
+  border: 1px solid #b42318;
+  background: #fff5f5;
+  color: #b42318;
+}
+
+.status {
+  margin-top: 0.85rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+@media (max-width: 760px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}

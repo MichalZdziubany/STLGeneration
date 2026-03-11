@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import AuthNavLink from "@/components/AuthNavLink";
 import landingStyles from "../LandingPage.module.css";
 import styles from "./ExampleTemplates.module.css";
 
@@ -54,7 +55,7 @@ export default function ExampleTemplatesPage() {
           <Link href="/templates">Templates</Link>
           <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
-          <Link href="/login" className={landingStyles.loginBtn}>Log In / Sign In</Link>
+          <AuthNavLink className={landingStyles.loginBtn} />
         </nav>
       </header>
 

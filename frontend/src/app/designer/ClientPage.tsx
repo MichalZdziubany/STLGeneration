@@ -4,7 +4,9 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import StlPreview from "@/components/StlPreview";
+import AuthNavLink from "@/components/AuthNavLink";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserProfileSettings } from "@/lib/firestore";
 import landingStyles from "../LandingPage.module.css";
 import styles from "../DesignerPage.module.css";
 
@@ -45,6 +47,7 @@ export default function ClientPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [autoPreview, setAutoPreview] = useState(true);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [sliderMax, setSliderMax] = useState(200);
   const previewObjectUrlRef = useRef<string | null>(null);
 
   // Helper: Check if template is a user template
@@ -97,6 +100,32 @@ export default function ClientPage() {
       throw new Error(msg);
     }
   };
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      if (!user?.uid) {
+        setSliderMax(200);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfileSettings(user.uid);
+        if (!alive) return;
+        const maxDim = Math.max(profile.printWidth, profile.printHeight, profile.printLength, 1);
+        setSliderMax(maxDim);
+      } catch {
+        if (!alive) return;
+        setSliderMax(200);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     let alive = true;
@@ -160,8 +189,8 @@ export default function ClientPage() {
     const parsed = Number(trimmed);
     const hasNumber = trimmed !== "" && !Number.isNaN(parsed);
     const step = trimmed.includes(".") ? 0.1 : 1;
-    const clamped = hasNumber ? Math.min(Math.max(parsed, 0), 200) : 0;
-    return { min: 0, max: 200, step, value: clamped, enabled: true };
+    const clamped = hasNumber ? Math.min(Math.max(parsed, 0), sliderMax) : 0;
+    return { min: 0, max: sliderMax, step, value: clamped, enabled: true };
   };
 
   const normalizeParams = (source: Record<string, string>) => {
@@ -407,7 +436,7 @@ export default function ClientPage() {
           <Link href="/templates">Templates</Link>
           <Link href="/upload">Upload</Link>
           <Link href="/about">About</Link>
-          <Link href="/login" className={landingStyles.loginBtn}>Log In / Sign In</Link>
+          <AuthNavLink className={landingStyles.loginBtn} />
         </nav>
       </header>
 

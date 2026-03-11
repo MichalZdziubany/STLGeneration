@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   getDocs,
   query,
   where,
@@ -26,6 +27,21 @@ export interface FirebaseTemplate {
   updatedAt?: string;
   jsFile?: string;
 }
+
+export interface UserProfileSettings {
+  printer: "ender-3" | "ender-3-v3" | "ender-3-max";
+  printWidth: number;
+  printHeight: number;
+  printLength: number;
+  updatedAt?: string;
+}
+
+export const DEFAULT_USER_PROFILE_SETTINGS: UserProfileSettings = {
+  printer: "ender-3",
+  printWidth: 220,
+  printHeight: 250,
+  printLength: 220,
+};
 
 /**
  * Save a template to Firestore
@@ -211,4 +227,55 @@ export async function fetchAllAvailableTemplates(
     seen.add(t.id);
     return true;
   });
+}
+
+/**
+ * Save or update profile settings for a user.
+ */
+export async function saveUserProfileSettings(
+  userId: string,
+  settings: UserProfileSettings
+): Promise<void> {
+  const docRef = doc(db, "users", userId, "settings", "profile");
+  const now = new Date().toISOString();
+  await setDoc(
+    docRef,
+    {
+      ...settings,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Load user profile settings; returns defaults when none exist.
+ */
+export async function getUserProfileSettings(
+  userId: string
+): Promise<UserProfileSettings> {
+  const docRef = doc(db, "users", userId, "settings", "profile");
+  const snapshot = await getDoc(docRef);
+
+  if (!snapshot.exists()) {
+    return { ...DEFAULT_USER_PROFILE_SETTINGS };
+  }
+
+  const data = snapshot.data() as Partial<UserProfileSettings>;
+
+  return {
+    printer: (data.printer as UserProfileSettings["printer"]) ?? DEFAULT_USER_PROFILE_SETTINGS.printer,
+    printWidth: Number(data.printWidth ?? DEFAULT_USER_PROFILE_SETTINGS.printWidth),
+    printHeight: Number(data.printHeight ?? DEFAULT_USER_PROFILE_SETTINGS.printHeight),
+    printLength: Number(data.printLength ?? DEFAULT_USER_PROFILE_SETTINGS.printLength),
+    updatedAt: data.updatedAt,
+  };
+}
+
+/**
+ * Remove profile settings document for a user.
+ */
+export async function deleteUserProfileSettings(userId: string): Promise<void> {
+  const docRef = doc(db, "users", userId, "settings", "profile");
+  await deleteDoc(docRef);
 }
