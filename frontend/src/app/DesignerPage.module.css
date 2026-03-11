@@ -28,6 +28,19 @@
   margin-bottom: 16px;
 }
 
+.previewControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
 .panelTitle {
   margin: 0;
   font-size: 20px;
@@ -94,4 +107,16 @@
   align-items: center;
   justify-content: center;
   color: #000;
+  overflow: hidden;
+}
+
+.viewerWrap {
+  width: 100%;
+  height: 320px;
+}
+
+.previewMeta {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #444;
 }

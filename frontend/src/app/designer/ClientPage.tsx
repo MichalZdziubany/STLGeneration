@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import StlPreview from "@/components/StlPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import landingStyles from "../LandingPage.module.css";
 import styles from "../DesignerPage.module.css";
@@ -39,6 +40,12 @@ export default function ClientPage() {
   const [generating, setGenerating] = useState(false);
   const [slicing, setSlicing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>("Ready");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMsg, setPreviewMsg] = useState<string>("Adjust parameters to render a live preview.");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [autoPreview, setAutoPreview] = useState(true);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const previewObjectUrlRef = useRef<string | null>(null);
 
   // Helper: Check if template is a user template
   const isUserTemplate = (template: TemplateCard | null): boolean => {
@@ -157,17 +164,150 @@ export default function ClientPage() {
     return { min: 0, max: 200, step, value: clamped, enabled: true };
   };
 
+  const normalizeParams = (source: Record<string, string>) => {
+    const normalized: Record<string, string | number> = {};
+    Object.entries(source).forEach(([k, v]) => {
+      if (!v || v.trim() === "") return;
+      const n = Number(v);
+      normalized[k] = Number.isNaN(n) ? v : n;
+    });
+    return normalized;
+  };
+
+  const buildTemplatePayload = async (normalized: Record<string, string | number>) => {
+    const payload: Record<string, any> = {
+      params: normalized,
+      user_id: user?.uid,
+    };
+
+    if (!selected) {
+      throw new Error("No template selected");
+    }
+
+    if (isUserTemplate(selected)) {
+      if (!selected.userId) {
+        throw new Error("User template missing userId");
+      }
+
+      const jsContent = await fetchUserTemplateContent(selected.id, selected.userId);
+      if (!jsContent) {
+        throw new Error("Failed to load template content");
+      }
+
+      const scadCode = await executeUserTemplate(jsContent, normalized);
+      if (!scadCode) {
+        throw new Error("Template execution produced no SCAD code");
+      }
+
+      payload.scad_code = scadCode;
+      return payload;
+    }
+
+    payload.template_id = selected.file ?? selected.id;
+    return payload;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        window.URL.revokeObjectURL(previewObjectUrlRef.current);
+        previewObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const renderPreview = async (signal: AbortSignal) => {
+    if (!selected) {
+      setPreviewMsg("Select a template to preview.");
+      setPreviewUrl(null);
+      return;
+    }
+
+    const hasInput = Object.values(params).some((value) => value.trim() !== "");
+    if (!hasInput) {
+      setPreviewMsg("Adjust parameters to render a live preview.");
+      setPreviewUrl(null);
+      return;
+    }
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (user?.uid) {
+      headers["user-id"] = user.uid;
+    }
+
+    setPreviewLoading(true);
+    setPreviewMsg("Rendering preview…");
+    try {
+      const normalized = normalizeParams(params);
+      const payload = await buildTemplatePayload(normalized);
+
+      const res = await fetch(`${apiBaseUrl}/generate-stl`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal,
+      });
+
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      const blob = await res.blob();
+      const nextUrl = window.URL.createObjectURL(blob);
+
+      if (previewObjectUrlRef.current) {
+        window.URL.revokeObjectURL(previewObjectUrlRef.current);
+      }
+      previewObjectUrlRef.current = nextUrl;
+      setPreviewUrl(nextUrl);
+      setPreviewMsg("Live preview updated.");
+    } catch (err) {
+      if (signal.aborted) return;
+      if (previewObjectUrlRef.current) {
+        window.URL.revokeObjectURL(previewObjectUrlRef.current);
+        previewObjectUrlRef.current = null;
+      }
+      setPreviewUrl(null);
+      const msg = err instanceof Error ? err.message : "Failed to render preview";
+      setPreviewMsg(msg);
+    } finally {
+      if (!signal.aborted) {
+        setPreviewLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!autoPreview) {
+      setPreviewMsg("Auto preview is off. Click Refresh Preview.");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      renderPreview(controller.signal);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [selected, params, apiBaseUrl, user?.uid, autoPreview]);
+
+  useEffect(() => {
+    if (autoPreview || previewRefreshKey === 0) return;
+    const controller = new AbortController();
+    renderPreview(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [previewRefreshKey, autoPreview]);
+
   const onSlice = async () => {
     if (!selected) return;
     setSlicing(true);
     setStatusMsg("Slicing to G-code…");
     try {
-      const normalized: Record<string, string | number> = {};
-      Object.entries(params).forEach(([k, v]) => {
-        if (!v || v.trim() === "") return;
-        const n = Number(v);
-        normalized[k] = Number.isNaN(n) ? v : n;
-      });
+      const normalized = normalizeParams(params);
 
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -183,27 +323,13 @@ export default function ClientPage() {
         user_id: user?.uid,
       };
 
-      // Handle user templates
-      if (isUserTemplate(selected)) {
-        if (!selected.userId) {
-          throw new Error("User template missing userId");
-        }
-
-        const jsContent = await fetchUserTemplateContent(selected.id, selected.userId);
-        if (!jsContent) {
-          throw new Error("Failed to load template content");
-        }
-
-        setStatusMsg("Executing template…");
-        const scadCode = await executeUserTemplate(jsContent, normalized);
-        if (!scadCode) {
-          throw new Error("Template execution produced no SCAD code");
-        }
-
-        slicePayload.scad_code = scadCode;
-      } else {
-        // Built-in template
-        slicePayload.template_id = selected.file ?? selected.id;
+      setStatusMsg("Executing template…");
+      const sharedPayload = await buildTemplatePayload(normalized);
+      if (sharedPayload.scad_code) {
+        slicePayload.scad_code = sharedPayload.scad_code;
+      }
+      if (sharedPayload.template_id) {
+        slicePayload.template_id = sharedPayload.template_id;
       }
 
       setStatusMsg("Slicing to G-code…");
@@ -236,12 +362,7 @@ export default function ClientPage() {
     setGenerating(true);
     setStatusMsg("Generating STL…");
     try {
-      const normalized: Record<string, string | number> = {};
-      Object.entries(params).forEach(([k, v]) => {
-        if (!v || v.trim() === "") return;
-        const n = Number(v);
-        normalized[k] = Number.isNaN(n) ? v : n;
-      });
+      const normalized = normalizeParams(params);
 
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -250,33 +371,8 @@ export default function ClientPage() {
         headers["user-id"] = user.uid;
       }
 
-      let generatePayload: Record<string, any> = {
-        params: normalized,
-        user_id: user?.uid,
-      };
-
-      // Handle user templates
-      if (isUserTemplate(selected)) {
-        if (!selected.userId) {
-          throw new Error("User template missing userId");
-        }
-
-        const jsContent = await fetchUserTemplateContent(selected.id, selected.userId);
-        if (!jsContent) {
-          throw new Error("Failed to load template content");
-        }
-
-        setStatusMsg("Executing template…");
-        const scadCode = await executeUserTemplate(jsContent, normalized);
-        if (!scadCode) {
-          throw new Error("Template execution produced no SCAD code");
-        }
-
-        generatePayload.scad_code = scadCode;
-      } else {
-        // Built-in template
-        generatePayload.template_id = selected.file ?? selected.id;
-      }
+      setStatusMsg("Executing template…");
+      const generatePayload = await buildTemplatePayload(normalized);
 
       setStatusMsg("Generating STL…");
       const res = await fetch(`${apiBaseUrl}/generate-stl`, {
@@ -379,10 +475,35 @@ export default function ClientPage() {
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3 className={styles.panelTitle}>3D Preview</h3>
+              <div className={styles.previewControls}>
+                <label className={styles.toggleLabel}>
+                  <input
+                    type="checkbox"
+                    checked={autoPreview}
+                    onChange={(e) => setAutoPreview(e.target.checked)}
+                  />
+                  Auto Preview
+                </label>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setPreviewRefreshKey((prev) => prev + 1)}
+                  disabled={previewLoading}
+                >
+                  {previewLoading ? "Refreshing…" : "Refresh Preview"}
+                </button>
+              </div>
             </div>
             <div className={styles.previewBox}>
-              <span>{statusMsg}</span>
+              {previewUrl ? (
+                <div className={styles.viewerWrap}>
+                  <StlPreview url={previewUrl} />
+                </div>
+              ) : (
+                <span>{previewLoading ? "Rendering preview…" : previewMsg}</span>
+              )}
             </div>
+            <p className={styles.previewMeta}>{statusMsg}</p>
           </div>
         </div>
       </section>
