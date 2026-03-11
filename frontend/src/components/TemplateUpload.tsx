@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { saveTemplateToFirestore } from "@/lib/firestore";
 
@@ -13,6 +13,12 @@ interface ExtractedParameter {
 
 export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }) {
   const { user } = useAuth();
+  const apiBaseUrl = useMemo(() => {
+    const serverDefault = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    if (typeof window === "undefined") return serverDefault;
+    return process.env.NEXT_PUBLIC_API_URL_BROWSER ?? serverDefault;
+  }, []);
+
   const [file, setFile] = useState<File | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [description, setDescription] = useState("");
@@ -163,8 +169,7 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
       formData.append("tags", tags);
 
       // Upload to backend
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/templates/upload`, {
+      const response = await fetch(`${apiBaseUrl}/templates/upload`, {
         method: "POST",
         headers: {
           "user-id": user.uid,
