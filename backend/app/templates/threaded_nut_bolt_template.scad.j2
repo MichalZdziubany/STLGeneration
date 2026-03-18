@@ -1,0 +1,116 @@
+//
+// THREADED NUT + BOLT TEMPLATE
+// Generates two separate parts in one STL layout:
+// 1) A hex-head bolt with external thread
+// 2) A matching hex nut with internal thread
+//
+// Parameters are injected by backend.
+//
+
+bolt_len        = {{BOLT_LENGTH}};
+major_d         = {{THREAD_MAJOR_DIAMETER}};
+pitch           = {{THREAD_PITCH}};
+thread_depth_in = {{THREAD_DEPTH}};
+head_h          = {{HEAD_HEIGHT}};
+head_flat       = {{HEAD_FLAT_DIAMETER}};
+nut_h           = {{NUT_THICKNESS}};
+nut_flat        = {{NUT_FLAT_DIAMETER}};
+clearance       = {{THREAD_CLEARANCE}};
+part_spacing    = {{PART_SPACING}};
+segments        = {{SEGMENTS}};
+part_mode       = "{{ PART_MODE | default('both') }}";
+
+eps = 0.01;
+hex_to_circ = 1 / cos(30);
+
+// Keep geometric values in stable ranges for CSG operations.
+thread_depth = min(thread_depth_in, max(0.15, major_d * 0.23));
+thread_core_d = max(major_d - 2 * thread_depth, 0.8);
+threaded_len = max(bolt_len - head_h, pitch * 2);
+turns = max(threaded_len / pitch, 1);
+slices = max(24, ceil(turns * 30));
+
+module external_thread(major, core, len, pitch_val, depth, facets) {
+    union() {
+        // Core shaft
+        cylinder(h = len, d = core, center = false, $fn = facets);
+
+        // Helical triangular ridge
+        linear_extrude(
+            height = len,
+            twist = 360 * (len / pitch_val),
+            slices = max(12, ceil((len / pitch_val) * 28)),
+            convexity = 10
+        )
+            translate([core / 2, 0, 0])
+                polygon(points = [
+                    [0, -pitch_val * 0.32],
+                    [depth, 0],
+                    [0, pitch_val * 0.32]
+                ]);
+    }
+}
+
+module internal_thread_cut(nominal_major, len, pitch_val, depth, fit, facets) {
+    // Larger nominal size creates practical clearance for FDM prints.
+    nominal = nominal_major + fit;
+    core_d = max(nominal - 2 * depth, 0.6);
+
+    union() {
+        // Through-hole core
+        translate([0, 0, -eps])
+            cylinder(h = len + 2 * eps, d = core_d, center = false, $fn = facets);
+
+        // Helical subtraction to form internal thread
+        linear_extrude(
+            height = len + 2 * eps,
+            twist = 360 * ((len + 2 * eps) / pitch_val),
+            slices = max(12, ceil(((len + 2 * eps) / pitch_val) * 28)),
+            convexity = 12
+        )
+            translate([core_d / 2, 0, -eps])
+                polygon(points = [
+                    [0, -pitch_val * 0.35],
+                    [depth + fit * 0.45, 0],
+                    [0, pitch_val * 0.35]
+                ]);
+    }
+}
+
+module hex_prism(height, flat_diameter) {
+    cylinder(h = height, d = flat_diameter * hex_to_circ, center = false, $fn = 6);
+}
+
+module bolt() {
+    union() {
+        // Hex head
+        hex_prism(head_h, head_flat);
+
+        // External thread starts right above the head
+        translate([0, 0, head_h])
+            external_thread(major_d, thread_core_d, threaded_len, pitch, thread_depth, segments);
+    }
+}
+
+module nut() {
+    difference() {
+        // Hex body
+        hex_prism(nut_h, nut_flat);
+
+        // Internal thread
+        internal_thread_cut(major_d, nut_h, pitch, thread_depth, clearance, segments);
+    }
+}
+
+// PART_MODE options:
+// - "both": render bolt and nut on one bed
+// - "bolt": render only bolt
+// - "nut": render only nut
+if (part_mode == "both" || part_mode == "bolt") {
+    bolt();
+}
+
+if (part_mode == "both" || part_mode == "nut") {
+    translate([max(head_flat, nut_flat) + major_d + part_spacing, 0, 0])
+        nut();
+}

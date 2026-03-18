@@ -46,6 +46,27 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         ],
         "tags": ["Utility", "Print-in-place"],
     },
+    "threaded_nut_bolt_template.scad.j2": {
+        "id": "threaded_nut_bolt",
+        "name": "Threaded Nut + Bolt Pair",
+        "geometry": "Multi-part Mechanical",
+        "dimensions": "M6-M24 class, pitch-aware",
+        "description": "Generate a matched bolt and nut pair with adjustable pitch, thread depth, and print spacing.",
+        "parameters": [
+            "BOLT_LENGTH",
+            "THREAD_MAJOR_DIAMETER",
+            "THREAD_PITCH",
+            "THREAD_DEPTH",
+            "HEAD_HEIGHT",
+            "HEAD_FLAT_DIAMETER",
+            "NUT_THICKNESS",
+            "NUT_FLAT_DIAMETER",
+            "THREAD_CLEARANCE",
+            "PART_SPACING",
+            "SEGMENTS",
+        ],
+        "tags": ["Mechanical", "Advanced", "Multi-part"],
+    },
 }
 
 

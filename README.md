@@ -9,6 +9,7 @@ This is my final year project: a web app that lets you design simple parametric 
 
 ## What it does
 - Parametric model templates rendered via OpenSCAD.
+- Includes advanced multi-part templates like a matched threaded nut + bolt pair.
 - Server-side STL generation with sane defaults.
 - One-click slicing to G-code using profiles (e.g., balanced Ender 3 settings).
 - Minimal, clean UI built with Next.js.
@@ -34,6 +35,8 @@ High-level flow:
 - `POST /generate-stl` — body: `{ template_id, params }` → returns binary STL.
 - `POST /slice` — body: `{ template_id, params, slice_settings?, profile? }` → returns G-code.
 - `POST /slice-stl` — body: `{ stl_filename, slice_settings?, profile? }` → returns G-code for an existing STL.
+- `POST /generate-stl` with `{ multi_part: true, parts: [...] }` — returns ZIP of multiple STLs rendered from one template.
+- `POST /slice` with `{ multi_part: true, parts: [...] }` — returns ZIP of multiple G-code files sliced from one template.
 - `GET /profiles` — list available slicing profiles.
 - `GET /profiles/{name}` — get full settings for a profile.
 - `GET /printers` — list Cura printer definitions and build volumes discovered from Cura resources.
@@ -101,6 +104,59 @@ curl -X POST http://localhost:8000/slice \
 		"params": { "CUBE_SIZE": 20, "CENTERED": false },
 		"profile": "balanced_profile"
 	}' --output cube.gcode
+```
+
+Generate two STL files (bolt + nut) from one template file:
+
+```bash
+curl -X POST http://localhost:8000/generate-stl \
+	-H "Content-Type: application/json" \
+	-d '{
+		"template_id": "threaded_nut_bolt",
+		"params": {
+			"BOLT_LENGTH": 40,
+			"THREAD_MAJOR_DIAMETER": 8,
+			"THREAD_PITCH": 1.25,
+			"THREAD_DEPTH": 0.55,
+			"HEAD_HEIGHT": 6,
+			"HEAD_FLAT_DIAMETER": 13,
+			"NUT_THICKNESS": 6.5,
+			"NUT_FLAT_DIAMETER": 13,
+			"THREAD_CLEARANCE": 0.25,
+			"PART_SPACING": 16,
+			"SEGMENTS": 72
+		},
+		"multi_part": true,
+		"parts": ["bolt", "nut"],
+		"part_selector_param": "PART_MODE"
+	}' --output threaded_parts_stl.zip
+```
+
+Slice two G-code files (bolt + nut) from one template file:
+
+```bash
+curl -X POST http://localhost:8000/slice \
+	-H "Content-Type: application/json" \
+	-d '{
+		"template_id": "threaded_nut_bolt",
+		"params": {
+			"BOLT_LENGTH": 40,
+			"THREAD_MAJOR_DIAMETER": 8,
+			"THREAD_PITCH": 1.25,
+			"THREAD_DEPTH": 0.55,
+			"HEAD_HEIGHT": 6,
+			"HEAD_FLAT_DIAMETER": 13,
+			"NUT_THICKNESS": 6.5,
+			"NUT_FLAT_DIAMETER": 13,
+			"THREAD_CLEARANCE": 0.25,
+			"PART_SPACING": 16,
+			"SEGMENTS": 72
+		},
+		"profile": "balanced_profile",
+		"multi_part": true,
+		"parts": ["bolt", "nut"],
+		"part_selector_param": "PART_MODE"
+	}' --output threaded_parts_gcode.zip
 ```
 
 Alternatively, slice an existing STL from the jobs folder:

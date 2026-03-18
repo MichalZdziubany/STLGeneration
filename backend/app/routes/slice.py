@@ -1,4 +1,6 @@
 from typing import Any, Dict, Optional
+from io import BytesIO
+import zipfile
 
 from fastapi import APIRouter, HTTPException, Response, Header
 from pydantic import BaseModel, Field
@@ -13,6 +15,7 @@ from app.services.slicer import (
 from app.services.template_catalog import get_template_metadata
 from app.services.user_template_generator import generate_stl_from_scad_code, validate_scad_code
 from pathlib import Path
+from app.services.stl_generator import generate_multi_part_stls
 
 
 class SliceRequest(BaseModel):
@@ -28,6 +31,18 @@ class SliceRequest(BaseModel):
     )
     user_id: Optional[str] = Field(None, description="User ID for user templates")
     scad_code: Optional[str] = Field(None, description="Pre-generated SCAD code (from user template execution)")
+    multi_part: bool = Field(
+        default=False,
+        description="When true, slices one STL per part selector value and returns a ZIP.",
+    )
+    parts: list[str] = Field(
+        default_factory=list,
+        description="Part selector values, e.g. [bolt, nut].",
+    )
+    part_selector_param: str = Field(
+        default="PART_MODE",
+        description="Template parameter used as part selector.",
+    )
 
 
 class SliceSTLRequest(BaseModel):
@@ -59,6 +74,12 @@ def route_slice_model(
     
     # If SCAD code is provided, use it directly
     if payload.scad_code:
+        if payload.multi_part:
+            raise HTTPException(
+                status_code=400,
+                detail="multi_part is currently supported only with template_id",
+            )
+
         # Validate SCAD code
         is_valid, validation_msg = validate_scad_code(payload.scad_code)
         if not is_valid:
@@ -93,6 +114,37 @@ def route_slice_model(
     template = get_template_metadata(payload.template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
+
+    if payload.multi_part:
+        if not payload.parts:
+            raise HTTPException(status_code=400, detail="parts is required when multi_part=true")
+
+        try:
+            stl_paths = generate_multi_part_stls(
+                template["file"],
+                payload.params,
+                payload.parts,
+                payload.part_selector_param,
+            )
+
+            gcode_paths = [
+                slice_stl_to_gcode(stl_path, payload.slice_settings, payload.profile)
+                for stl_path in stl_paths
+            ]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for gcode_path in gcode_paths:
+                zf.writestr(gcode_path.name, gcode_path.read_bytes())
+
+        zip_name = f"{template['id']}-gcodes.zip"
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+        )
 
     try:
         stl_path, gcode_path = slice_model(
