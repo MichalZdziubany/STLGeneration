@@ -20,33 +20,8 @@ Templates collection structure:
 }
 """
 
-import os
-import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
-
-
-# Note: This is a reference structure for documenting Firebase setup
-# In production, use firebase-admin SDK
-
-FIRESTORE_RULES = """
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Templates collection
-    match /templates/{userId} {
-      // Allow users to read their own templates
-      allow read: if request.auth.uid == userId;
-      allow write: if request.auth.uid == userId;
-    }
-    
-    // Public templates (readable by all)
-    match /public_templates/{templateId} {
-      allow read: if true;
-    }
-  }
-}
-"""
 
 
 def firebase_template_to_dict(template_data: Dict[str, Any]) -> Dict[str, Any]:

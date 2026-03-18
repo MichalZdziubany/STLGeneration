@@ -10,6 +10,13 @@ from app.services.utils import JOBS_DIR
 USER_TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "user_templates"
 
 
+def _atomic_write_json(path: Path, data: Dict[str, Any]) -> None:
+    """Atomically write JSON to avoid partial reads while listing templates."""
+    tmp_path = path.with_suffix(f"{path.suffix}.tmp")
+    tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    tmp_path.replace(path)
+
+
 def ensure_user_template_dir(user_id: str) -> Path:
     """Create user template directory if it doesn't exist."""
     user_dir = USER_TEMPLATES_DIR / user_id
@@ -58,7 +65,7 @@ def save_user_template(
     }
     
     metadata_path = template_dir / "metadata.json"
-    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    _atomic_write_json(metadata_path, metadata)
     
     return metadata
 
@@ -117,6 +124,25 @@ def get_public_templates() -> List[Dict[str, Any]]:
     return public_templates
 
 
+def get_user_template_metadata(user_id: str, template_id: str) -> Optional[Dict[str, Any]]:
+    """Get metadata for a single user template."""
+    metadata_path = USER_TEMPLATES_DIR / user_id / template_id / "metadata.json"
+    if not metadata_path.exists():
+        return None
+
+    try:
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+    except Exception:
+        return None
+
+    if "parameters" in metadata and isinstance(metadata["parameters"], list):
+        if metadata["parameters"] and isinstance(metadata["parameters"][0], dict):
+            metadata["parameters"] = [p["name"] for p in metadata["parameters"]]
+
+    return metadata
+
+
 def get_template_content(user_id: str, template_id: str) -> Optional[str]:
     """Get the template file content for a user template."""
     template_dir = USER_TEMPLATES_DIR / user_id / template_id
@@ -166,8 +192,7 @@ def update_template_metadata(
         
         metadata["updatedAt"] = datetime.utcnow().isoformat()
         
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
+        _atomic_write_json(metadata_path, metadata)
         
         # Normalize parameters before returning
         if "parameters" in metadata and isinstance(metadata["parameters"], list):

@@ -244,7 +244,7 @@ export default function Home() {
                 </div>
               )}
 
-              <Link href={`/designer?id=${encodeURIComponent(template.file)}`} className={styles.templateCta}>
+              <Link href={`/designer?id=${encodeURIComponent(template.id)}`} className={styles.templateCta}>
                 Load Template →
               </Link>
             </article>

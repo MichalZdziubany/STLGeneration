@@ -56,14 +56,15 @@ export default function ClientPage() {
   };
 
   // Helper: Fetch user template JS content from backend
-  const fetchUserTemplateContent = async (templateId: string, userId: string): Promise<string | null> => {
+  const fetchUserTemplateContent = async (templateId: string, ownerUserId: string): Promise<string | null> => {
     try {
       const headers: HeadersInit = {};
       if (user?.uid) {
         headers["user-id"] = user.uid;
       }
 
-      const res = await fetch(`${apiBaseUrl}/templates/${templateId}`, { headers });
+      const owner = encodeURIComponent(ownerUserId);
+      const res = await fetch(`${apiBaseUrl}/templates/${templateId}?owner_user_id=${owner}`, { headers });
       if (!res.ok) return null;
 
       const data = await res.json();
@@ -159,10 +160,7 @@ export default function ClientPage() {
     };
   }, [apiBaseUrl, user?.uid]);
 
-  const selected = useMemo(
-    () => templates.find((t) => t.id === selectedId || t.file === selectedId) ?? null,
-    [templates, selectedId]
-  );
+  const selected = useMemo(() => templates.find((t) => t.id === selectedId) ?? null, [templates, selectedId]);
 
   useEffect(() => {
     if (!selected) {
@@ -232,7 +230,7 @@ export default function ClientPage() {
       return payload;
     }
 
-    payload.template_id = selected.file ?? selected.id;
+    payload.template_id = selected.id;
     return payload;
   };
 
@@ -373,7 +371,7 @@ export default function ClientPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(selected.file ?? selected.id).replace(".scad.j2", "")}-${Date.now()}.gcode`;
+      a.download = `${selected.id.replace(".scad.j2", "")}-${Date.now()}.gcode`;
       a.click();
       window.URL.revokeObjectURL(url);
       setStatusMsg("G-code downloaded successfully.");
@@ -415,7 +413,7 @@ export default function ClientPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(selected.file ?? selected.id).replace(".scad.j2", "")}-${Date.now()}.stl`;
+      a.download = `${selected.id.replace(".scad.j2", "")}-${Date.now()}.stl`;
       a.click();
       window.URL.revokeObjectURL(url);
       setStatusMsg("STL downloaded successfully.");

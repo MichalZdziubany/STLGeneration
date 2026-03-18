@@ -88,7 +88,7 @@ export default function TemplatesPage() {
                   ))}
               </ul>
             )}
-            <Link href={`/designer?id=${encodeURIComponent(t.file)}`} className={styles.templateCta}>
+            <Link href={`/designer?id=${encodeURIComponent(t.id)}`} className={styles.templateCta}>
               Load in Designer →
             </Link>
           </article>

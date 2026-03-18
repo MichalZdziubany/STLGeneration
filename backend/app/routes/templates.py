@@ -9,6 +9,7 @@ from app.services.user_templates import (
     get_user_templates,
     get_public_templates,
     get_template_content,
+    get_user_template_metadata,
     delete_user_template,
     update_template_metadata,
 )
@@ -91,25 +92,51 @@ async def upload_template(
 
 
 @router.get("/templates/{template_id}")
-def get_template(template_id: str, user_id: Optional[str] = Header(None)):
+def get_template(
+    template_id: str,
+    user_id: Optional[str] = Header(None),
+    owner_user_id: Optional[str] = None,
+):
     """Get template content and metadata."""
-    
+
+    if owner_user_id:
+        metadata = get_user_template_metadata(owner_user_id, template_id)
+        if not metadata:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+        # Owner can access directly; others can only access if public.
+        if owner_user_id != user_id and not metadata.get("isPublic", False):
+            raise HTTPException(status_code=403, detail="Template is private")
+
+        content = get_template_content(owner_user_id, template_id)
+        if content is None:
+            raise HTTPException(status_code=404, detail="Template content not found")
+
+        return {"content": content, "metadata": metadata}
+
     # Try to get as user template
     if user_id:
         content = get_template_content(user_id, template_id)
         if content:
-            templates = get_user_templates(user_id)
-            metadata = next((t for t in templates if t["id"] == template_id), None)
+            metadata = get_user_template_metadata(user_id, template_id)
             if metadata:
                 return {"content": content, "metadata": metadata}
-    
+
     # Try public templates
-    public_templates = get_public_templates()
-    metadata = next((t for t in public_templates if t["id"] == template_id), None)
-    
-    if metadata:
-        user_id = metadata.get("userId")
-        content = get_template_content(user_id, template_id)
+    public_matches = [t for t in get_public_templates() if t.get("id") == template_id]
+
+    if len(public_matches) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Template ID is ambiguous. Provide owner_user_id query parameter.",
+        )
+
+    if len(public_matches) == 1:
+        metadata = public_matches[0]
+        owner = metadata.get("userId")
+        content = get_template_content(owner, template_id) if owner else None
+        if content is None:
+            raise HTTPException(status_code=404, detail="Template content not found")
         return {"content": content, "metadata": metadata}
     
     raise HTTPException(status_code=404, detail="Template not found")
