@@ -22,21 +22,92 @@ import styles from "./ProfilePage.module.css";
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
+  const apiBaseUrl = useMemo(() => {
+    const serverDefault = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    if (typeof window === "undefined") return serverDefault;
+    return process.env.NEXT_PUBLIC_API_URL_BROWSER ?? serverDefault;
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Ready");
+
+  const [printerOptions, setPrinterOptions] = useState<
+    Array<{
+      id: string;
+      name: string;
+      build_volume: {
+        width: number;
+        depth: number;
+        height: number;
+      };
+    }>
+  >([]);
+  const [printersLoading, setPrintersLoading] = useState(false);
 
   const [printer, setPrinter] = useState<UserProfileSettings["printer"]>(DEFAULT_USER_PROFILE_SETTINGS.printer);
   const [printWidth, setPrintWidth] = useState(String(DEFAULT_USER_PROFILE_SETTINGS.printWidth));
   const [printHeight, setPrintHeight] = useState(String(DEFAULT_USER_PROFILE_SETTINGS.printHeight));
   const [printLength, setPrintLength] = useState(String(DEFAULT_USER_PROFILE_SETTINGS.printLength));
 
+  const resolveLegacyPrinter = (legacyPrinter: string) => {
+    const normalized = legacyPrinter.toLowerCase();
+    if (!printerOptions.length) return null;
+
+    if (normalized === "ender-3") {
+      return printerOptions.find((p) => p.id.toLowerCase().includes("ender3.def.json")) ?? null;
+    }
+    if (normalized === "ender-3-v3") {
+      return printerOptions.find((p) => p.id.toLowerCase().includes("ender3v3")) ?? null;
+    }
+    if (normalized === "ender-3-max") {
+      return printerOptions.find((p) => p.id.toLowerCase().includes("ender3max")) ?? null;
+    }
+
+    return null;
+  };
+
+  const applyPrinterDimensions = (printerId: string) => {
+    const selectedPrinter = printerOptions.find((p) => p.id === printerId);
+    if (!selectedPrinter) return;
+    setPrintWidth(String(selectedPrinter.build_volume.width));
+    setPrintLength(String(selectedPrinter.build_volume.depth));
+    setPrintHeight(String(selectedPrinter.build_volume.height));
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    let alive = true;
+    const loadPrinters = async () => {
+      setPrintersLoading(true);
+      try {
+        const res = await fetch(`${apiBaseUrl}/printers`);
+        if (!res.ok) {
+          throw new Error(`Backend returned ${res.status}`);
+        }
+        const payload = await res.json();
+        if (!alive) return;
+        setPrinterOptions(payload.printers ?? []);
+      } catch {
+        if (!alive) return;
+        setPrinterOptions([]);
+      } finally {
+        if (alive) {
+          setPrintersLoading(false);
+        }
+      }
+    };
+
+    loadPrinters();
+    return () => {
+      alive = false;
+    };
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -65,6 +136,23 @@ export default function ProfilePage() {
       alive = false;
     };
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!printerOptions.length) return;
+
+    const selectedPrinter = printerOptions.find((p) => p.id === printer);
+    if (selectedPrinter) {
+      return;
+    }
+
+    const mapped = resolveLegacyPrinter(printer);
+    if (mapped) {
+      setPrinter(mapped.id);
+      setPrintWidth(String(mapped.build_volume.width));
+      setPrintLength(String(mapped.build_volume.depth));
+      setPrintHeight(String(mapped.build_volume.height));
+    }
+  }, [printerOptions, printer]);
 
   const sliderMax = useMemo(() => {
     const values = [Number(printWidth), Number(printHeight), Number(printLength)].filter((n) => !Number.isNaN(n));
@@ -175,11 +263,23 @@ export default function ProfilePage() {
                 id="printer"
                 className={styles.select}
                 value={printer}
-                onChange={(e) => setPrinter(e.target.value as UserProfileSettings["printer"])}
+                onChange={(e) => {
+                  const selectedPrinterId = e.target.value;
+                  setPrinter(selectedPrinterId);
+                  applyPrinterDimensions(selectedPrinterId);
+                }}
+                disabled={printersLoading}
               >
-                <option value="ender-3">Ender 3</option>
-                <option value="ender-3-v3">Ender 3V3</option>
-                <option value="ender-3-max">Ender 3 Max</option>
+                {printerOptions.length === 0 && (
+                  <option value={printer}>
+                    {printersLoading ? "Loading printers..." : "No Cura printers discovered"}
+                  </option>
+                )}
+                {printerOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </div>
 

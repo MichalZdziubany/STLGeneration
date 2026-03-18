@@ -29,7 +29,7 @@ export interface FirebaseTemplate {
 }
 
 export interface UserProfileSettings {
-  printer: "ender-3" | "ender-3-v3" | "ender-3-max";
+  printer: string;
   printWidth: number;
   printHeight: number;
   printLength: number;
@@ -37,7 +37,7 @@ export interface UserProfileSettings {
 }
 
 export const DEFAULT_USER_PROFILE_SETTINGS: UserProfileSettings = {
-  printer: "ender-3",
+  printer: "creality_ender3.def.json",
   printWidth: 220,
   printHeight: 250,
   printLength: 220,
