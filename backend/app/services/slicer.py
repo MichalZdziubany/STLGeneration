@@ -1,8 +1,9 @@
 import uuid
 import subprocess
 import json
+import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from app.services.utils import (
     JOBS_DIR,
@@ -21,6 +22,94 @@ EXTRUDERS_DIR = get_cura_resources_root() / "extruders"
 #       .inst.cfg files are NOT JSON and cannot be passed to -j directly.
 QUALITY_DIR = get_cura_resources_root() / "quality"
 QUALITY_DIR = get_cura_resources_root() / "quality"
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned == "":
+            return None
+
+        # Keep only the first numeric token (e.g. "220", "220.0", "220mm").
+        match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
+        if not match:
+            return None
+
+        try:
+            return float(match.group(0))
+        except ValueError:
+            return None
+
+    return None
+
+
+def _extract_machine_dimension(def_json: Dict[str, Any], key: str) -> Optional[float]:
+    value = _get_override_value(def_json, key, None)
+    return _to_float(value)
+
+
+def _normalize_printer_name(file_name: str, def_json: Dict[str, Any]) -> str:
+    for candidate in (
+        def_json.get("name"),
+        def_json.get("metadata", {}).get("name"),
+        def_json.get("metadata", {}).get("machine_name"),
+    ):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+
+    return file_name.replace(".def.json", "").replace("_", " ").title()
+
+
+def list_printers() -> List[Dict[str, Any]]:
+    """
+    List Cura printer definitions discovered from the installed Cura resources.
+
+    Returns only definitions that expose machine width/depth/height values.
+    """
+    printers: List[Dict[str, Any]] = []
+
+    if not DEFINITIONS_DIR.exists():
+        return printers
+
+    ignored_files = {
+        "fdmprinter.def.json",
+        "fdmextruder.def.json",
+        "fdmprinter_errata.def.json",
+        "fdmextruder_errata.def.json",
+    }
+
+    for def_path in sorted(DEFINITIONS_DIR.glob("*.def.json")):
+        if def_path.name in ignored_files:
+            continue
+
+        def_json = _load_json(def_path)
+        if not def_json:
+            continue
+
+        width = _extract_machine_dimension(def_json, "machine_width")
+        depth = _extract_machine_dimension(def_json, "machine_depth")
+        height = _extract_machine_dimension(def_json, "machine_height")
+
+        if width is None or depth is None or height is None:
+            continue
+
+        printers.append(
+            {
+                "id": def_path.name,
+                "name": _normalize_printer_name(def_path.name, def_json),
+                "definition": def_path.name,
+                "build_volume": {
+                    "width": width,
+                    "depth": depth,
+                    "height": height,
+                },
+            }
+        )
+
+    return printers
 
 
 def _load_json(path: Path) -> Dict[str, Any]:

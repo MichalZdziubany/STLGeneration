@@ -7,7 +7,8 @@ from app.services.slicer import (
     slice_stl_to_gcode, 
     slice_model, 
     list_settings_profiles,
-    get_profile_settings
+    get_profile_settings,
+    list_printers,
 )
 from app.services.template_catalog import get_template_metadata
 from app.services.user_template_generator import generate_stl_from_scad_code, validate_scad_code
@@ -165,6 +166,18 @@ def get_profile(profile_name: str):
         raise HTTPException(status_code=404, detail="Profile not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load profile: {str(e)}")
+
+
+@router.get("/printers")
+def get_printers():
+    """
+    List discovered Cura printer definitions with build volume dimensions.
+    """
+    try:
+        printers = list_printers()
+        return {"printers": printers}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list printers: {str(e)}")
 
 
 @router.get("/slice-settings")
