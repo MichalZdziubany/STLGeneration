@@ -36,6 +36,7 @@ High-level flow:
 - `POST /slice-stl` — body: `{ stl_filename, slice_settings?, profile? }` → returns G-code for an existing STL.
 - `GET /profiles` — list available slicing profiles.
 - `GET /profiles/{name}` — get full settings for a profile.
+- `GET /printers` — list Cura printer definitions and build volumes discovered from Cura resources.
 
 ## Quick Start (Docker)
 Prerequisites: Docker + Docker Compose.
