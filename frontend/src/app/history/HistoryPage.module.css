@@ -1,0 +1,115 @@
+.wrap {
+  padding: 40px;
+}
+
+.card {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #9b9494;
+  border: solid white 10px;
+  border-radius: 40px;
+  padding: 24px;
+}
+
+.inner {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  color: #111;
+}
+
+.subtitle {
+  margin: 8px 0 16px;
+  color: #444;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.refreshBtn,
+.reuseBtn,
+.copyBtn {
+  border: 1px solid #000;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.itemTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.itemTitle {
+  margin: 0;
+  color: #111;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.itemMeta {
+  margin: 4px 0 0;
+  color: #555;
+  font-size: 12px;
+}
+
+.outputs {
+  margin: 10px 0 0;
+  color: #222;
+  font-size: 13px;
+}
+
+.details {
+  margin-top: 10px;
+}
+
+.jsonBlock {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f2f2f2;
+  color: #1d1d1d;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.empty {
+  margin: 0;
+  color: #666;
+}
+
+@media (max-width: 900px) {
+  .itemTop {
+    flex-direction: column;
+  }
+}

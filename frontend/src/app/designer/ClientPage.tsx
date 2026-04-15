@@ -31,6 +31,25 @@ type SliceProfile = {
   file?: string;
 };
 
+type RunOutput = {
+  type: string;
+  filename: string;
+  path?: string;
+  size_bytes?: number;
+};
+
+type RunRecord = {
+  id: string;
+  created_at: string;
+  operation: string;
+  template_id?: string | null;
+  params?: Record<string, any>;
+  profile?: string | null;
+  slice_settings?: Record<string, any> | null;
+  printer_definition?: string | null;
+  outputs?: RunOutput[];
+};
+
 export default function ClientPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id");
@@ -54,6 +73,8 @@ export default function ClientPage() {
   const [sliceProfilesLoading, setSliceProfilesLoading] = useState(false);
   const [selectedSliceProfileId, setSelectedSliceProfileId] = useState<string>("balanced_profile");
   const [adhesionMode, setAdhesionMode] = useState<string>("preset");
+  const [runHistory, setRunHistory] = useState<RunRecord[]>([]);
+  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [threadedPreviewUrls, setThreadedPreviewUrls] = useState<{ bolt: string | null; nut: string | null }>({
     bolt: null,
@@ -266,6 +287,60 @@ export default function ClientPage() {
     return normalized;
   };
 
+  const loadRunHistory = async () => {
+    setRunHistoryLoading(true);
+    try {
+      const headers: HeadersInit = {};
+      if (user?.uid) {
+        headers["user-id"] = user.uid;
+      }
+
+      const res = await fetch(`${apiBaseUrl}/runs?limit=20`, { headers });
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      const payload = await res.json();
+      setRunHistory(payload.runs ?? []);
+    } catch {
+      setRunHistory([]);
+    } finally {
+      setRunHistoryLoading(false);
+    }
+  };
+
+  const applyRun = (run: RunRecord) => {
+    const runTemplateId = typeof run.template_id === "string" ? run.template_id : null;
+    if (runTemplateId) {
+      const exists = templates.some((t) => t.id === runTemplateId);
+      if (exists) {
+        setSelectedId(runTemplateId);
+      }
+    }
+
+    const nextParams: Record<string, string> = {};
+    Object.entries(run.params ?? {}).forEach(([key, value]) => {
+      nextParams[key] = String(value);
+    });
+    setParams(nextParams);
+
+    if (run.profile && sliceProfiles.some((p) => p.id === run.profile)) {
+      setSelectedSliceProfileId(run.profile);
+    }
+
+    const adhesion = run.slice_settings?.adhesion_type;
+    if (typeof adhesion === "string" && adhesion.trim() !== "") {
+      setAdhesionMode(adhesion);
+    } else {
+      setAdhesionMode("preset");
+    }
+
+    setStatusMsg(`Loaded run ${run.id.slice(0, 8)} for reproduction.`);
+  };
+
+  const formatRunDate = (iso: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return iso;
+    return date.toLocaleString();
+  };
+
   const buildTemplatePayload = async (normalized: Record<string, string | number>) => {
     const payload: Record<string, any> = {
       params: normalized,
@@ -463,6 +538,10 @@ export default function ClientPage() {
     };
   }, [previewRefreshKey, autoPreview]);
 
+  useEffect(() => {
+    loadRunHistory();
+  }, [apiBaseUrl, user?.uid]);
+
   const onSlice = async () => {
     if (!selected) return;
     setSlicing(true);
@@ -518,6 +597,7 @@ export default function ClientPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut G-code ZIP downloaded." : "G-code downloaded successfully.");
+      loadRunHistory();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to slice G-code";
       setStatusMsg(msg);
@@ -567,6 +647,7 @@ export default function ClientPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut STL ZIP downloaded." : "STL downloaded successfully.");
+      loadRunHistory();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate STL";
       setStatusMsg(msg);
@@ -583,6 +664,7 @@ export default function ClientPage() {
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>
           <Link href="/upload">Upload</Link>
+          <Link href="/history">History</Link>
           <Link href="/about">About</Link>
           <AuthNavLink className={landingStyles.loginBtn} />
         </nav>
@@ -693,6 +775,52 @@ export default function ClientPage() {
                     <Link href="/templates" className={styles.secondaryBtn}>Back to templates</Link>
                   </div>
                 </form>
+
+                <div className={styles.historyPanel}>
+                  <div className={styles.historyHeaderRow}>
+                    <h4 className={styles.historyTitle}>Job history and reproducibility</h4>
+                    <button
+                      type="button"
+                      className={styles.secondaryBtn}
+                      onClick={loadRunHistory}
+                      disabled={runHistoryLoading}
+                    >
+                      {runHistoryLoading ? "Refreshing…" : "Refresh"}
+                    </button>
+                  </div>
+                  <p className={styles.historyHelp}>
+                    Reuse a previous run to restore template parameters, slicer profile, and adhesion override.
+                  </p>
+                  <div className={styles.historyList}>
+                    {runHistory.length === 0 ? (
+                      <p className={styles.historyEmpty}>
+                        {runHistoryLoading ? "Loading history…" : "No runs yet."}
+                      </p>
+                    ) : (
+                      runHistory.map((run) => (
+                        <div key={run.id} className={styles.historyItem}>
+                          <div>
+                            <p className={styles.historyItemTitle}>
+                              {(run.template_id || "custom") + " • " + run.operation}
+                            </p>
+                            <p className={styles.historyItemMeta}>
+                              {formatRunDate(run.created_at)}
+                            </p>
+                            <p className={styles.historyItemMeta}>
+                              Profile: {run.profile || "n/a"} • Printer: {run.printer_definition || "n/a"}
+                            </p>
+                            <p className={styles.historyItemMeta}>
+                              Outputs: {(run.outputs || []).map((o) => o.filename).join(", ") || "none"}
+                            </p>
+                          </div>
+                          <button type="button" className={styles.secondaryBtn} onClick={() => applyRun(run)}>
+                            Load run
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </>
             )}
           </div>
