@@ -32,7 +32,7 @@
 
 .subtitle {
   margin: 8px 0 16px;
-  color: #444;
+  color: #000;
 }
 
 .controls {
@@ -48,6 +48,15 @@
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.refreshBtn:disabled {
+  color: #000;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .historyList {
@@ -79,18 +88,32 @@
 
 .itemMeta {
   margin: 4px 0 0;
-  color: #555;
+  color: #000;
   font-size: 12px;
 }
 
 .outputs {
   margin: 10px 0 0;
-  color: #222;
+  color: #000;
   font-size: 13px;
 }
 
 .details {
   margin-top: 10px;
+  color: #000;
+}
+
+.details summary {
+  color: #000;
+  font-weight: 600;
+}
+
+.details summary::marker {
+  color: #000;
+}
+
+.details select {
+  color: #000;
 }
 
 .jsonBlock {
@@ -98,14 +121,14 @@
   padding: 10px;
   border-radius: 8px;
   background: #f2f2f2;
-  color: #1d1d1d;
+  color: #000;
   font-size: 12px;
   overflow-x: auto;
 }
 
 .empty {
   margin: 0;
-  color: #666;
+  color: #000;
 }
 
 @media (max-width: 900px) {

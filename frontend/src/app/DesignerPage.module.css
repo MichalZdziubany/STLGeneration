@@ -153,6 +153,69 @@
   background: #fafafa;
 }
 
+.gcodeInsightPanel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #d8d8d8;
+  border-radius: 10px;
+  background: #fcfcfc;
+}
+
+.gcodeInsightTitle {
+  margin: 0;
+  font-size: 15px;
+}
+
+.gcodeInsightMeta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #555;
+}
+
+.gcodeInsightGrid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gcodeInsightStat {
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+}
+
+.gcodeInsightStat span {
+  font-size: 11px;
+  color: #666;
+}
+
+.gcodeInsightStat strong {
+  font-size: 14px;
+  color: #111;
+}
+
+.pathPreviewWrap {
+  margin-top: 10px;
+}
+
+.pathPreviewLabel {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #555;
+}
+
+.pathPreviewSvg {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  display: block;
+}
+
 .historyHeaderRow {
   display: flex;
   align-items: center;
@@ -249,5 +312,9 @@
   .historyItem {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .gcodeInsightGrid {
+    grid-template-columns: 1fr;
   }
 }

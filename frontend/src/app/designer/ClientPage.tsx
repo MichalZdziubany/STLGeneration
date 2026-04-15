@@ -50,6 +50,14 @@ type RunRecord = {
   outputs?: RunOutput[];
 };
 
+type GcodeInsight = {
+  printTimeSeconds: number | null;
+  filamentUsedRaw: string | null;
+  layerCount: number | null;
+  maxSpeedMmPerSec: number | null;
+  pathPoints: Array<{ x: number; y: number }>;
+};
+
 export default function ClientPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id");
@@ -69,6 +77,10 @@ export default function ClientPage() {
   const [generating, setGenerating] = useState(false);
   const [slicing, setSlicing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>("Ready");
+  const [sliceInsight, setSliceInsight] = useState<GcodeInsight | null>(null);
+  const [sliceResultBlobUrl, setSliceResultBlobUrl] = useState<string | null>(null);
+  const [sliceResultFileName, setSliceResultFileName] = useState<string | null>(null);
+  const [sliceResultMimeType, setSliceResultMimeType] = useState<string | null>(null);
   const [sliceProfiles, setSliceProfiles] = useState<SliceProfile[]>([]);
   const [sliceProfilesLoading, setSliceProfilesLoading] = useState(false);
   const [selectedSliceProfileId, setSelectedSliceProfileId] = useState<string>("balanced_profile");
@@ -86,6 +98,7 @@ export default function ClientPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [sliderMax, setSliderMax] = useState(200);
   const previewObjectUrlRef = useRef<string | null>(null);
+  const sliceResultObjectUrlRef = useRef<string | null>(null);
   const threadedPreviewObjectUrlsRef = useRef<{ bolt: string | null; nut: string | null }>({
     bolt: null,
     nut: null,
@@ -287,6 +300,246 @@ export default function ClientPage() {
     return normalized;
   };
 
+  const parseGcodeInsights = (gcodeText: string): GcodeInsight => {
+    const lines = gcodeText.split(/\r?\n/);
+
+    let headerPrintTimeSeconds: number | null = null;
+    let headerFilamentUsedRaw: string | null = null;
+    let layerCount: number | null = null;
+    let maxFeedRateMmPerMin = 0;
+    let inFirstLayer = false;
+    let currentX = 0;
+    let currentY = 0;
+    let currentZ = 0;
+    let currentE = 0;
+    let currentF = 0;
+    let absolutePositioning = true;
+    let absoluteExtrusion = true;
+    let estimatedTimeSeconds = 0;
+    let totalExtrudedFilamentMm = 0;
+    const pathPoints: Array<{ x: number; y: number }> = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+
+      if (headerPrintTimeSeconds === null && line.startsWith(";TIME:")) {
+        const n = Number(line.replace(";TIME:", "").trim());
+        if (!Number.isNaN(n)) {
+          headerPrintTimeSeconds = n;
+        }
+      }
+
+      if (headerFilamentUsedRaw === null && line.startsWith(";Filament used:")) {
+        headerFilamentUsedRaw = line.replace(";Filament used:", "").trim();
+      }
+
+      if (layerCount === null && line.startsWith(";LAYER_COUNT:")) {
+        const n = Number(line.replace(";LAYER_COUNT:", "").trim());
+        if (!Number.isNaN(n)) {
+          layerCount = n;
+        }
+      }
+
+      if (line.startsWith(";LAYER:0")) {
+        inFirstLayer = true;
+      } else if (line.startsWith(";LAYER:1")) {
+        inFirstLayer = false;
+      }
+
+      const code = line.split(";")[0].trim();
+      if (!code) {
+        continue;
+      }
+
+      if (code.startsWith("G90")) {
+        absolutePositioning = true;
+        continue;
+      }
+      if (code.startsWith("G91")) {
+        absolutePositioning = false;
+        continue;
+      }
+      if (code.startsWith("M82")) {
+        absoluteExtrusion = true;
+        continue;
+      }
+      if (code.startsWith("M83")) {
+        absoluteExtrusion = false;
+        continue;
+      }
+      if (code.startsWith("G92")) {
+        const eMatch = code.match(/\bE(-?\d+(?:\.\d+)?)/);
+        if (eMatch) {
+          const e = Number(eMatch[1]);
+          if (!Number.isNaN(e)) {
+            currentE = e;
+          }
+        }
+        const xMatch = code.match(/\bX(-?\d+(?:\.\d+)?)/);
+        if (xMatch) {
+          const x = Number(xMatch[1]);
+          if (!Number.isNaN(x)) {
+            currentX = x;
+          }
+        }
+        const yMatch = code.match(/\bY(-?\d+(?:\.\d+)?)/);
+        if (yMatch) {
+          const y = Number(yMatch[1]);
+          if (!Number.isNaN(y)) {
+            currentY = y;
+          }
+        }
+        const zMatch = code.match(/\bZ(-?\d+(?:\.\d+)?)/);
+        if (zMatch) {
+          const z = Number(zMatch[1]);
+          if (!Number.isNaN(z)) {
+            currentZ = z;
+          }
+        }
+        continue;
+      }
+
+      if (!(code.startsWith("G0") || code.startsWith("G1"))) {
+        continue;
+      }
+
+      const fMatch = code.match(/\bF(-?\d+(?:\.\d+)?)/);
+      if (fMatch) {
+        const f = Number(fMatch[1]);
+        if (!Number.isNaN(f) && f > 0) {
+          currentF = f;
+          maxFeedRateMmPerMin = Math.max(maxFeedRateMmPerMin, f);
+        }
+      }
+
+      let nextX = currentX;
+      let nextY = currentY;
+      let nextZ = currentZ;
+      let nextE = currentE;
+
+      const xMatch = code.match(/\bX(-?\d+(?:\.\d+)?)/);
+      if (xMatch) {
+        const x = Number(xMatch[1]);
+        if (!Number.isNaN(x)) {
+          nextX = absolutePositioning ? x : currentX + x;
+        }
+      }
+      const yMatch = code.match(/\bY(-?\d+(?:\.\d+)?)/);
+      if (yMatch) {
+        const y = Number(yMatch[1]);
+        if (!Number.isNaN(y)) {
+          nextY = absolutePositioning ? y : currentY + y;
+        }
+      }
+      const zMatch = code.match(/\bZ(-?\d+(?:\.\d+)?)/);
+      if (zMatch) {
+        const z = Number(zMatch[1]);
+        if (!Number.isNaN(z)) {
+          nextZ = absolutePositioning ? z : currentZ + z;
+        }
+      }
+
+      let deltaE = 0;
+      const eMatch = code.match(/\bE(-?\d+(?:\.\d+)?)/);
+      if (eMatch) {
+        const e = Number(eMatch[1]);
+        if (!Number.isNaN(e)) {
+          if (absoluteExtrusion) {
+            nextE = e;
+            deltaE = nextE - currentE;
+          } else {
+            deltaE = e;
+            nextE = currentE + e;
+          }
+        }
+      }
+
+      if (deltaE > 0) {
+        totalExtrudedFilamentMm += deltaE;
+      }
+
+      const deltaX = nextX - currentX;
+      const deltaY = nextY - currentY;
+      const deltaZ = nextZ - currentZ;
+      const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+
+      if (currentF > 0 && (moveDistance > 0 || deltaE !== 0)) {
+        const axisDistance = moveDistance > 0 ? moveDistance : Math.abs(deltaE);
+        estimatedTimeSeconds += axisDistance / (currentF / 60);
+      }
+
+      currentX = nextX;
+      currentY = nextY;
+      currentZ = nextZ;
+      currentE = nextE;
+
+      if (inFirstLayer && pathPoints.length < 3000) {
+        pathPoints.push({ x: currentX, y: currentY });
+      }
+    }
+
+    const computedPrintTime = estimatedTimeSeconds > 0 ? Math.round(estimatedTimeSeconds) : null;
+    const printTimeSeconds = computedPrintTime ?? headerPrintTimeSeconds;
+
+    const computedFilamentUsedRaw =
+      totalExtrudedFilamentMm > 0
+        ? `${(totalExtrudedFilamentMm / 1000).toFixed(2)} m (${totalExtrudedFilamentMm.toFixed(1)} mm)`
+        : null;
+
+    const filamentUsedRaw = computedFilamentUsedRaw ?? headerFilamentUsedRaw;
+
+    return {
+      printTimeSeconds,
+      filamentUsedRaw,
+      layerCount,
+      maxSpeedMmPerSec: maxFeedRateMmPerMin > 0 ? maxFeedRateMmPerMin / 60 : null,
+      pathPoints,
+    };
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (seconds === null || seconds < 0) return "n/a";
+    const total = Math.round(seconds);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    return `${m}m ${s}s`;
+  };
+
+  const buildPathSvgPoints = (points: Array<{ x: number; y: number }>) => {
+    if (points.length === 0) return "";
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+    const size = 260;
+    const pad = 12;
+    const inner = size - pad * 2;
+
+    return points
+      .map((p) => {
+        const x = pad + ((p.x - minX) / width) * inner;
+        const y = size - (pad + ((p.y - minY) / height) * inner);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  };
+
+  const onDownloadSliceResult = () => {
+    if (!sliceResultBlobUrl || !sliceResultFileName) {
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = sliceResultBlobUrl;
+    a.download = sliceResultFileName;
+    a.click();
+  };
+
   const loadRunHistory = async () => {
     setRunHistoryLoading(true);
     try {
@@ -387,6 +640,10 @@ export default function ClientPage() {
       if (threadedPreviewObjectUrlsRef.current.nut) {
         window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
         threadedPreviewObjectUrlsRef.current.nut = null;
+      }
+      if (sliceResultObjectUrlRef.current) {
+        window.URL.revokeObjectURL(sliceResultObjectUrlRef.current);
+        sliceResultObjectUrlRef.current = null;
       }
     };
   }, []);
@@ -593,14 +850,31 @@ export default function ClientPage() {
       if (!res.ok) throw new Error(`Backend returned ${res.status}`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = isThreadedNutBoltTemplate
+
+      if (sliceResultObjectUrlRef.current) {
+        window.URL.revokeObjectURL(sliceResultObjectUrlRef.current);
+      }
+      sliceResultObjectUrlRef.current = url;
+      setSliceResultBlobUrl(url);
+
+      const resultFileName = isThreadedNutBoltTemplate
         ? `${selected.id}-${Date.now()}-gcodes.zip`
         : `${selected.id.replace(".scad.j2", "")}-${Date.now()}.gcode`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut G-code ZIP downloaded." : "G-code downloaded successfully.");
+      setSliceResultFileName(resultFileName);
+      setSliceResultMimeType(blob.type || "application/octet-stream");
+
+      if (!isThreadedNutBoltTemplate) {
+        const gcodeText = await blob.text();
+        setSliceInsight(parseGcodeInsights(gcodeText));
+      } else {
+        setSliceInsight(null);
+      }
+
+      setStatusMsg(
+        isThreadedNutBoltTemplate
+          ? "G-code ZIP is ready. Review details, then click Download."
+          : "G-code insights ready. Review and click Download G-code."
+      );
       loadRunHistory();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to slice G-code";
@@ -776,9 +1050,74 @@ export default function ClientPage() {
                     <button type="button" className={styles.secondaryBtn} onClick={onSlice} disabled={slicing}>
                       {slicing ? "Slicing…" : "Slice G-code"}
                     </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryBtn}
+                      onClick={onDownloadSliceResult}
+                      disabled={!sliceResultBlobUrl || !sliceResultFileName}
+                    >
+                      Download G-code
+                    </button>
                     <Link href="/templates" className={styles.secondaryBtn}>Back to templates</Link>
                   </div>
                 </form>
+
+                {sliceResultBlobUrl && (
+                  <div className={styles.gcodeInsightPanel}>
+                    <h4 className={styles.gcodeInsightTitle}>Slicing Insights</h4>
+                    <p className={styles.gcodeInsightMeta}>File: {sliceResultFileName}</p>
+
+                    {sliceResultMimeType?.includes("zip") ? (
+                      <p className={styles.gcodeInsightMeta}>
+                        Multi-part ZIP detected. Basic insights preview is available for single G-code outputs.
+                      </p>
+                    ) : sliceInsight ? (
+                      <>
+                        <div className={styles.gcodeInsightGrid}>
+                          <div className={styles.gcodeInsightStat}>
+                            <span>Estimated print time</span>
+                            <strong>{formatDuration(sliceInsight.printTimeSeconds)}</strong>
+                          </div>
+                          <div className={styles.gcodeInsightStat}>
+                            <span>Filament usage</span>
+                            <strong>{sliceInsight.filamentUsedRaw || "n/a"}</strong>
+                          </div>
+                          <div className={styles.gcodeInsightStat}>
+                            <span>Layer count</span>
+                            <strong>{sliceInsight.layerCount ?? "n/a"}</strong>
+                          </div>
+                          <div className={styles.gcodeInsightStat}>
+                            <span>Max speed</span>
+                            <strong>
+                              {sliceInsight.maxSpeedMmPerSec !== null
+                                ? `${sliceInsight.maxSpeedMmPerSec.toFixed(1)} mm/s`
+                                : "n/a"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className={styles.pathPreviewWrap}>
+                          <p className={styles.pathPreviewLabel}>Basic path preview (first printable layer)</p>
+                          {sliceInsight.pathPoints.length > 1 ? (
+                            <svg viewBox="0 0 260 260" className={styles.pathPreviewSvg}>
+                              <rect x="0" y="0" width="260" height="260" rx="8" ry="8" fill="#f9f9f9" stroke="#ddd" />
+                              <polyline
+                                fill="none"
+                                stroke="#111"
+                                strokeWidth="1"
+                                points={buildPathSvgPoints(sliceInsight.pathPoints)}
+                              />
+                            </svg>
+                          ) : (
+                            <p className={styles.gcodeInsightMeta}>Not enough XY moves to render preview.</p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className={styles.gcodeInsightMeta}>Insights not available for this output.</p>
+                    )}
+                  </div>
+                )}
 
                 <div className={styles.historyPanel}>
                   <div className={styles.historyHeaderRow}>
