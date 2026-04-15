@@ -88,11 +88,13 @@ export default function UploadPage() {
           <div className={styles.infoSection}>
             <h3>How to Create a Template</h3>
             <ol>
-              <li>Create a Jinja2 template file with .scad.j2 extension</li>
-              <li>Define parameters with Jinja2 comments: {`{# @param name {type} description #}`}</li>
-              <li>Upload the file with metadata</li>
-              <li>Make it public to share with others</li>
+              <li>Create an OpenSCAD + Jinja template file ending in <strong>.scad.j2</strong>.</li>
+              <li>Expose parameters with uppercase placeholders used by this project, for example <code>{`{{HEIGHT}}`}</code>, <code>{`{{DIAMETER}}`}</code>, <code>{`{{SEGMENTS}}`}</code>.</li>
+              <li>Map each placeholder to an OpenSCAD variable like <code>height = {`{{HEIGHT}}`};</code>.</li>
+              <li>Optional: add a comment on the same line or above it to improve detected parameter labels in upload preview.</li>
+              <li>Upload the file with name/description/tags, then mark it public if you want others to use it.</li>
             </ol>
+
             <Link href="/example-templates" className={styles.docsLink}>
               View Example Templates -&gt;
             </Link>
