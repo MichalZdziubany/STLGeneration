@@ -11,11 +11,34 @@ from app.services.slicer import (
     list_settings_profiles,
     get_profile_settings,
     list_printers,
+    merge_settings,
+    normalize_settings,
 )
 from app.services.template_catalog import get_template_metadata
 from app.services.user_template_generator import generate_stl_from_scad_code, validate_scad_code
 from pathlib import Path
 from app.services.stl_generator import generate_multi_part_stls
+from app.services.job_history import record_run
+
+
+def _build_slice_repro_context(profile: str, overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    try:
+        profile_data = get_profile_settings(profile)
+        base_settings = profile_data.get("settings", {})
+        printer_definition = profile_data.get("metadata", {}).get("printer_definition")
+    except FileNotFoundError:
+        base_settings = {}
+        printer_definition = None
+
+    merged = merge_settings(base_settings, overrides or {})
+    effective = normalize_settings(merged)
+
+    return {
+        "profile": profile,
+        "slice_settings": overrides or None,
+        "effective_slice_settings": effective,
+        "printer_definition": printer_definition,
+    }
 
 
 class SliceRequest(BaseModel):
@@ -92,10 +115,42 @@ def route_slice_model(
         
         # Then slice the STL to G-code
         try:
+            repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
             gcode_path = slice_stl_to_gcode(
                 stl_path,
                 payload.slice_settings,
                 payload.profile
+            )
+            record_run(
+                {
+                    "user_id": final_user_id,
+                    "operation": "slice",
+                    "template_id": payload.template_id,
+                    "template_file": None,
+                    "template_source": "scad_code",
+                    "params": payload.params,
+                    "profile": repro["profile"],
+                    "slice_settings": repro["slice_settings"],
+                    "effective_slice_settings": repro["effective_slice_settings"],
+                    "printer_definition": repro["printer_definition"],
+                    "multi_part": False,
+                    "parts": [],
+                    "part_selector_param": payload.part_selector_param,
+                    "outputs": [
+                        {
+                            "type": "stl",
+                            "filename": stl_path.name,
+                            "path": str(stl_path),
+                            "size_bytes": stl_path.stat().st_size,
+                        },
+                        {
+                            "type": "gcode",
+                            "filename": gcode_path.name,
+                            "path": str(gcode_path),
+                            "size_bytes": gcode_path.stat().st_size,
+                        },
+                    ],
+                }
             )
             return Response(
                 content=gcode_path.read_bytes(),
@@ -120,6 +175,7 @@ def route_slice_model(
             raise HTTPException(status_code=400, detail="parts is required when multi_part=true")
 
         try:
+            repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
             stl_paths = generate_multi_part_stls(
                 template["file"],
                 payload.params,
@@ -131,6 +187,42 @@ def route_slice_model(
                 slice_stl_to_gcode(stl_path, payload.slice_settings, payload.profile)
                 for stl_path in stl_paths
             ]
+
+            record_run(
+                {
+                    "user_id": final_user_id,
+                    "operation": "slice",
+                    "template_id": template["id"],
+                    "template_file": template["file"],
+                    "template_source": "template_id",
+                    "params": payload.params,
+                    "profile": repro["profile"],
+                    "slice_settings": repro["slice_settings"],
+                    "effective_slice_settings": repro["effective_slice_settings"],
+                    "printer_definition": repro["printer_definition"],
+                    "multi_part": True,
+                    "parts": payload.parts,
+                    "part_selector_param": payload.part_selector_param,
+                    "outputs": [
+                        {
+                            "type": "stl",
+                            "filename": stl_path.name,
+                            "path": str(stl_path),
+                            "size_bytes": stl_path.stat().st_size,
+                        }
+                        for stl_path in stl_paths
+                    ]
+                    + [
+                        {
+                            "type": "gcode",
+                            "filename": gcode_path.name,
+                            "path": str(gcode_path),
+                            "size_bytes": gcode_path.stat().st_size,
+                        }
+                        for gcode_path in gcode_paths
+                    ],
+                }
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
 
@@ -147,11 +239,43 @@ def route_slice_model(
         )
 
     try:
+        repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
         stl_path, gcode_path = slice_model(
             template["file"],
             payload.params,
             payload.slice_settings,
             payload.profile
+        )
+        record_run(
+            {
+                "user_id": final_user_id,
+                "operation": "slice",
+                "template_id": template["id"],
+                "template_file": template["file"],
+                "template_source": "template_id",
+                "params": payload.params,
+                "profile": repro["profile"],
+                "slice_settings": repro["slice_settings"],
+                "effective_slice_settings": repro["effective_slice_settings"],
+                "printer_definition": repro["printer_definition"],
+                "multi_part": False,
+                "parts": [],
+                "part_selector_param": payload.part_selector_param,
+                "outputs": [
+                    {
+                        "type": "stl",
+                        "filename": stl_path.name,
+                        "path": str(stl_path),
+                        "size_bytes": stl_path.stat().st_size,
+                    },
+                    {
+                        "type": "gcode",
+                        "filename": gcode_path.name,
+                        "path": str(gcode_path),
+                        "size_bytes": gcode_path.stat().st_size,
+                    },
+                ],
+            }
         )
         
         return Response(
@@ -177,10 +301,43 @@ def route_slice_existing_stl(payload: SliceSTLRequest):
         raise HTTPException(status_code=404, detail="STL file not found")
     
     try:
+        repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
         gcode_path = slice_stl_to_gcode(
             stl_path, 
             payload.slice_settings,
             payload.profile
+        )
+
+        record_run(
+            {
+                "user_id": None,
+                "operation": "slice_stl",
+                "template_id": None,
+                "template_file": None,
+                "template_source": "stl_file",
+                "params": {"stl_filename": payload.stl_filename},
+                "profile": repro["profile"],
+                "slice_settings": repro["slice_settings"],
+                "effective_slice_settings": repro["effective_slice_settings"],
+                "printer_definition": repro["printer_definition"],
+                "multi_part": False,
+                "parts": [],
+                "part_selector_param": "PART_MODE",
+                "outputs": [
+                    {
+                        "type": "stl",
+                        "filename": stl_path.name,
+                        "path": str(stl_path),
+                        "size_bytes": stl_path.stat().st_size,
+                    },
+                    {
+                        "type": "gcode",
+                        "filename": gcode_path.name,
+                        "path": str(gcode_path),
+                        "size_bytes": gcode_path.stat().st_size,
+                    },
+                ],
+            }
         )
         
         return Response(

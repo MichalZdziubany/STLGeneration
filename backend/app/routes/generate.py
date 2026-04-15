@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.services.stl_generator import generate_stl, generate_multi_part_stls
 from app.services.user_template_generator import generate_stl_from_scad_code, validate_scad_code
 from app.services.template_catalog import get_template_metadata
+from app.services.job_history import record_run
 
 
 class GenerateRequest(BaseModel):
@@ -59,6 +60,31 @@ def route_generate_stl(
         stl_path = generate_stl_from_scad_code(payload.scad_code, payload.params)
         
         if stl_path and stl_path.exists():
+            record_run(
+                {
+                    "user_id": final_user_id,
+                    "operation": "generate_stl",
+                    "template_id": payload.template_id,
+                    "template_file": None,
+                    "template_source": "scad_code",
+                    "params": payload.params,
+                    "profile": None,
+                    "slice_settings": None,
+                    "effective_slice_settings": None,
+                    "printer_definition": None,
+                    "multi_part": False,
+                    "parts": [],
+                    "part_selector_param": payload.part_selector_param,
+                    "outputs": [
+                        {
+                            "type": "stl",
+                            "filename": stl_path.name,
+                            "path": str(stl_path),
+                            "size_bytes": stl_path.stat().st_size,
+                        }
+                    ],
+                }
+            )
             return Response(content=stl_path.read_bytes(), media_type="model/stl")
         
         raise HTTPException(status_code=500, detail="Failed to generate STL from SCAD code")
@@ -90,6 +116,33 @@ def route_generate_stl(
             for stl_path in stl_paths:
                 zf.writestr(stl_path.name, stl_path.read_bytes())
 
+        record_run(
+            {
+                "user_id": final_user_id,
+                "operation": "generate_stl",
+                "template_id": template["id"],
+                "template_file": template["file"],
+                "template_source": "template_id",
+                "params": payload.params,
+                "profile": None,
+                "slice_settings": None,
+                "effective_slice_settings": None,
+                "printer_definition": None,
+                "multi_part": True,
+                "parts": payload.parts,
+                "part_selector_param": payload.part_selector_param,
+                "outputs": [
+                    {
+                        "type": "stl",
+                        "filename": stl_path.name,
+                        "path": str(stl_path),
+                        "size_bytes": stl_path.stat().st_size,
+                    }
+                    for stl_path in stl_paths
+                ],
+            }
+        )
+
         zip_name = f"{template['id']}-stls.zip"
         return Response(
             content=zip_buffer.getvalue(),
@@ -98,4 +151,29 @@ def route_generate_stl(
         )
     
     stl_path = generate_stl(template["file"], payload.params)
+    record_run(
+        {
+            "user_id": final_user_id,
+            "operation": "generate_stl",
+            "template_id": template["id"],
+            "template_file": template["file"],
+            "template_source": "template_id",
+            "params": payload.params,
+            "profile": None,
+            "slice_settings": None,
+            "effective_slice_settings": None,
+            "printer_definition": None,
+            "multi_part": False,
+            "parts": [],
+            "part_selector_param": payload.part_selector_param,
+            "outputs": [
+                {
+                    "type": "stl",
+                    "filename": stl_path.name,
+                    "path": str(stl_path),
+                    "size_bytes": stl_path.stat().st_size,
+                }
+            ],
+        }
+    )
     return Response(content=stl_path.read_bytes(), media_type="model/stl")

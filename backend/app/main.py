@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.generate import router as stl_router
 from app.routes.templates import router as template_router
 from app.routes.slice import router as slice_router
+from app.routes.runs import router as runs_router
 
 
 app = FastAPI()
@@ -30,3 +31,4 @@ def root():
 app.include_router(stl_router)
 app.include_router(template_router)
 app.include_router(slice_router)
+app.include_router(runs_router)
