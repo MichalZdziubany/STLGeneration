@@ -59,6 +59,7 @@ export default function TemplatesPage() {
         <nav className={styles.navLinks}>
           <Link href="/">Home</Link>
           <Link href="/designer">Designer</Link>
+          <Link href="/history">History</Link>
           <Link href="/about">About</Link>
         </nav>
       </header>

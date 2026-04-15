@@ -27,6 +27,7 @@ export default function ContactPage() {
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>
           <Link href="/upload">Upload</Link>
+          <Link href="/history">History</Link>
           <Link href="/about">About</Link>
           <AuthNavLink className={landingStyles.loginBtn} />
         </nav>
