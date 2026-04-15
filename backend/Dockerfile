@@ -54,6 +54,9 @@ RUN cp /opt/cura-resources/definitions/fdmextruder.def.json /opt/cura-resources/
 ENV CURA_RESOURCES=/opt/cura-resources
 ENV CURA_ENGINE_SEARCH_PATH=/opt/cura-resources
 
+# Switch back to application directory for runtime code and dependencies.
+WORKDIR /app
+
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -1,6 +1,7 @@
 services:
   backend:
     build: ./backend
+    working_dir: /app
     ports:
       - "8000:8000"
     volumes:

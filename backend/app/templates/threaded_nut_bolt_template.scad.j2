@@ -13,15 +13,17 @@ pitch           = {{THREAD_PITCH}};
 thread_depth_in = {{THREAD_DEPTH}};
 head_h          = {{HEAD_HEIGHT}};
 head_flat       = {{HEAD_FLAT_DIAMETER}};
-nut_h           = {{NUT_THICKNESS}};
-nut_flat        = {{NUT_FLAT_DIAMETER}};
-clearance       = {{THREAD_CLEARANCE}};
-part_spacing    = {{PART_SPACING}};
 segments        = {{SEGMENTS}};
 part_mode       = "{{ PART_MODE | default('both') }}";
 
 eps = 0.01;
 hex_to_circ = 1 / cos(30);
+
+// Derived nut values from bolt dimensions to keep the form simple.
+nut_h = max(major_d * 0.75, pitch * 5, 2.0);
+nut_flat = max(major_d * 1.8, head_flat * 0.95, 4.0);
+clearance = min(max(major_d * 0.025, 0.15), 0.4);
+part_spacing = max(major_d * 1.5, pitch * 6, 6.0);
 
 // Keep geometric values in stable ranges for CSG operations.
 thread_depth = min(thread_depth_in, max(0.15, major_d * 0.23));

@@ -43,12 +43,20 @@ export default function ClientPage() {
   const [slicing, setSlicing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>("Ready");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [threadedPreviewUrls, setThreadedPreviewUrls] = useState<{ bolt: string | null; nut: string | null }>({
+    bolt: null,
+    nut: null,
+  });
   const [previewMsg, setPreviewMsg] = useState<string>("Adjust parameters to render a live preview.");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [autoPreview, setAutoPreview] = useState(true);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [sliderMax, setSliderMax] = useState(200);
   const previewObjectUrlRef = useRef<string | null>(null);
+  const threadedPreviewObjectUrlsRef = useRef<{ bolt: string | null; nut: string | null }>({
+    bolt: null,
+    nut: null,
+  });
 
   // Helper: Check if template is a user template
   const isUserTemplate = (template: TemplateCard | null): boolean => {
@@ -161,6 +169,10 @@ export default function ClientPage() {
   }, [apiBaseUrl, user?.uid]);
 
   const selected = useMemo(() => templates.find((t) => t.id === selectedId) ?? null, [templates, selectedId]);
+  const isThreadedNutBoltTemplate = useMemo(
+    () => !!selected && !isUserTemplate(selected) && selected.id === "threaded_nut_bolt",
+    [selected]
+  );
 
   useEffect(() => {
     if (!selected) {
@@ -240,6 +252,14 @@ export default function ClientPage() {
         window.URL.revokeObjectURL(previewObjectUrlRef.current);
         previewObjectUrlRef.current = null;
       }
+      if (threadedPreviewObjectUrlsRef.current.bolt) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
+        threadedPreviewObjectUrlsRef.current.bolt = null;
+      }
+      if (threadedPreviewObjectUrlsRef.current.nut) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
+        threadedPreviewObjectUrlsRef.current.nut = null;
+      }
     };
   }, []);
 
@@ -268,6 +288,51 @@ export default function ClientPage() {
     setPreviewMsg("Rendering preview…");
     try {
       const normalized = normalizeParams(params);
+
+      if (isThreadedNutBoltTemplate) {
+        const payload = await buildTemplatePayload(normalized);
+
+        const loadPart = async (part: "bolt" | "nut") => {
+          const res = await fetch(`${apiBaseUrl}/generate-stl`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              ...payload,
+              params: {
+                ...normalized,
+                PART_MODE: part,
+              },
+            }),
+            signal,
+          });
+          if (!res.ok) {
+            throw new Error(`Backend returned ${res.status}`);
+          }
+          const blob = await res.blob();
+          return window.URL.createObjectURL(blob);
+        };
+
+        const [boltUrl, nutUrl] = await Promise.all([loadPart("bolt"), loadPart("nut")]);
+
+        if (previewObjectUrlRef.current) {
+          window.URL.revokeObjectURL(previewObjectUrlRef.current);
+          previewObjectUrlRef.current = null;
+        }
+
+        if (threadedPreviewObjectUrlsRef.current.bolt) {
+          window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
+        }
+        if (threadedPreviewObjectUrlsRef.current.nut) {
+          window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
+        }
+
+        threadedPreviewObjectUrlsRef.current = { bolt: boltUrl, nut: nutUrl };
+        setThreadedPreviewUrls({ bolt: boltUrl, nut: nutUrl });
+        setPreviewUrl(null);
+        setPreviewMsg("Bolt and nut previews updated.");
+        return;
+      }
+
       const payload = await buildTemplatePayload(normalized);
 
       const res = await fetch(`${apiBaseUrl}/generate-stl`, {
@@ -286,6 +351,14 @@ export default function ClientPage() {
       }
       previewObjectUrlRef.current = nextUrl;
       setPreviewUrl(nextUrl);
+      if (threadedPreviewObjectUrlsRef.current.bolt) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
+      }
+      if (threadedPreviewObjectUrlsRef.current.nut) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
+      }
+      threadedPreviewObjectUrlsRef.current = { bolt: null, nut: null };
+      setThreadedPreviewUrls({ bolt: null, nut: null });
       setPreviewMsg("Live preview updated.");
     } catch (err) {
       if (signal.aborted) return;
@@ -294,6 +367,14 @@ export default function ClientPage() {
         previewObjectUrlRef.current = null;
       }
       setPreviewUrl(null);
+      if (threadedPreviewObjectUrlsRef.current.bolt) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
+      }
+      if (threadedPreviewObjectUrlsRef.current.nut) {
+        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
+      }
+      threadedPreviewObjectUrlsRef.current = { bolt: null, nut: null };
+      setThreadedPreviewUrls({ bolt: null, nut: null });
       const msg = err instanceof Error ? err.message : "Failed to render preview";
       setPreviewMsg(msg);
     } finally {
@@ -358,6 +439,11 @@ export default function ClientPage() {
       if (sharedPayload.template_id) {
         slicePayload.template_id = sharedPayload.template_id;
       }
+      if (isThreadedNutBoltTemplate) {
+        slicePayload.multi_part = true;
+        slicePayload.parts = ["bolt", "nut"];
+        slicePayload.part_selector_param = "PART_MODE";
+      }
 
       setStatusMsg("Slicing to G-code…");
       const res = await fetch(`${apiBaseUrl}/slice`, {
@@ -371,10 +457,12 @@ export default function ClientPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${selected.id.replace(".scad.j2", "")}-${Date.now()}.gcode`;
+      a.download = isThreadedNutBoltTemplate
+        ? `${selected.id}-${Date.now()}-gcodes.zip`
+        : `${selected.id.replace(".scad.j2", "")}-${Date.now()}.gcode`;
       a.click();
       window.URL.revokeObjectURL(url);
-      setStatusMsg("G-code downloaded successfully.");
+      setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut G-code ZIP downloaded." : "G-code downloaded successfully.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to slice G-code";
       setStatusMsg(msg);
@@ -400,6 +488,11 @@ export default function ClientPage() {
 
       setStatusMsg("Executing template…");
       const generatePayload = await buildTemplatePayload(normalized);
+      if (isThreadedNutBoltTemplate) {
+        generatePayload.multi_part = true;
+        generatePayload.parts = ["bolt", "nut"];
+        generatePayload.part_selector_param = "PART_MODE";
+      }
 
       setStatusMsg("Generating STL…");
       const res = await fetch(`${apiBaseUrl}/generate-stl`, {
@@ -413,10 +506,12 @@ export default function ClientPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${selected.id.replace(".scad.j2", "")}-${Date.now()}.stl`;
+      a.download = isThreadedNutBoltTemplate
+        ? `${selected.id}-${Date.now()}-stls.zip`
+        : `${selected.id.replace(".scad.j2", "")}-${Date.now()}.stl`;
       a.click();
       window.URL.revokeObjectURL(url);
-      setStatusMsg("STL downloaded successfully.");
+      setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut STL ZIP downloaded." : "STL downloaded successfully.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate STL";
       setStatusMsg(msg);
@@ -522,7 +617,22 @@ export default function ClientPage() {
               </div>
             </div>
             <div className={styles.previewBox}>
-              {previewUrl ? (
+              {isThreadedNutBoltTemplate && (threadedPreviewUrls.bolt || threadedPreviewUrls.nut) ? (
+                <div className={styles.previewDualGrid}>
+                  <div className={styles.previewCard}>
+                    <p className={styles.previewCardTitle}>Bolt</p>
+                    <div className={styles.viewerWrap}>
+                      {threadedPreviewUrls.bolt ? <StlPreview url={threadedPreviewUrls.bolt} /> : <span>No bolt preview.</span>}
+                    </div>
+                  </div>
+                  <div className={styles.previewCard}>
+                    <p className={styles.previewCardTitle}>Nut</p>
+                    <div className={styles.viewerWrap}>
+                      {threadedPreviewUrls.nut ? <StlPreview url={threadedPreviewUrls.nut} /> : <span>No nut preview.</span>}
+                    </div>
+                  </div>
+                </div>
+              ) : previewUrl ? (
                 <div className={styles.viewerWrap}>
                   <StlPreview url={previewUrl} />
                 </div>

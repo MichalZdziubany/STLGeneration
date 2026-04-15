@@ -127,10 +127,6 @@ curl -X POST http://localhost:8000/generate-stl \
 			"THREAD_DEPTH": 0.55,
 			"HEAD_HEIGHT": 6,
 			"HEAD_FLAT_DIAMETER": 13,
-			"NUT_THICKNESS": 6.5,
-			"NUT_FLAT_DIAMETER": 13,
-			"THREAD_CLEARANCE": 0.25,
-			"PART_SPACING": 16,
 			"SEGMENTS": 72
 		},
 		"multi_part": true,
@@ -153,10 +149,6 @@ curl -X POST http://localhost:8000/slice \
 			"THREAD_DEPTH": 0.55,
 			"HEAD_HEIGHT": 6,
 			"HEAD_FLAT_DIAMETER": 13,
-			"NUT_THICKNESS": 6.5,
-			"NUT_FLAT_DIAMETER": 13,
-			"THREAD_CLEARANCE": 0.25,
-			"PART_SPACING": 16,
 			"SEGMENTS": 72
 		},
 		"profile": "balanced_profile",
