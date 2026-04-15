@@ -37,7 +37,7 @@ export interface UserProfileSettings {
 }
 
 export const DEFAULT_USER_PROFILE_SETTINGS: UserProfileSettings = {
-  printer: "creality_ender3.def.json",
+  printer: "creality_ender3v3ke.def.json",
   printWidth: 220,
   printHeight: 250,
   printLength: 220,

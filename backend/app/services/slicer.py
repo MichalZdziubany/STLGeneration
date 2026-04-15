@@ -2,8 +2,9 @@ import uuid
 import subprocess
 import json
 import re
+import os
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set
 
 from app.services.utils import (
     JOBS_DIR,
@@ -21,7 +22,83 @@ EXTRUDERS_DIR = get_cura_resources_root() / "extruders"
 # Note: CuraEngine expects JSON definition/resolved settings via -j/-r.
 #       .inst.cfg files are NOT JSON and cannot be passed to -j directly.
 QUALITY_DIR = get_cura_resources_root() / "quality"
-QUALITY_DIR = get_cura_resources_root() / "quality"
+
+
+def _split_path_list(value: Optional[str]) -> List[Path]:
+    if not value:
+        return []
+    return [Path(part.strip()).expanduser() for part in value.split(os.pathsep) if part.strip()]
+
+
+def _get_definition_dirs() -> List[Path]:
+    """
+    Resolve all directories that may contain Cura machine definitions.
+
+    Search order prefers user/downstream definitions before the bundled resources,
+    so custom downloaded printers can override base names when needed.
+    """
+    paths: List[Path] = []
+
+    # Optional explicit directories containing .def.json files.
+    paths.extend(_split_path_list(os.getenv("CURA_DEFINITIONS_DIRS")))
+
+    # Optional resource roots where each root contains a definitions/ folder.
+    for root in _split_path_list(os.getenv("CURA_USER_RESOURCES")):
+        paths.append(root / "definitions")
+
+    # Common Cura user resource locations by platform.
+    home = Path.home()
+    for root in (
+        home / ".local" / "share" / "cura",
+        home / ".config" / "cura",
+        home / "AppData" / "Roaming" / "cura",
+    ):
+        if root.exists() and root.is_dir():
+            for entry in root.iterdir():
+                if not entry.is_dir():
+                    continue
+                definitions_dir = entry / "definitions"
+                if definitions_dir.exists() and definitions_dir.is_dir():
+                    paths.append(definitions_dir)
+
+    # Bundled Cura resources (used as baseline/fallback).
+    paths.append(DEFINITIONS_DIR)
+
+    deduped: List[Path] = []
+    seen: Set[str] = set()
+    for raw_path in paths:
+        p = raw_path.expanduser()
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        if p.exists() and p.is_dir():
+            deduped.append(p)
+
+    return deduped
+
+
+def _build_definition_index() -> Dict[str, Path]:
+    """
+    Build a definition-name to file-path index from all known definitions directories.
+    """
+    index: Dict[str, Path] = {}
+    for directory in _get_definition_dirs():
+        for def_path in sorted(directory.glob("*.def.json")):
+            # Keep first match to preserve search priority.
+            index.setdefault(def_path.name, def_path)
+    return index
+
+
+def _normalize_definition_name(name: str) -> str:
+    name = name.strip()
+    if name.endswith(".def.json"):
+        return name
+    return f"{name}.def.json"
+
+
+def _resolve_definition_path(definition_name: str, definition_index: Dict[str, Path]) -> Optional[Path]:
+    return definition_index.get(_normalize_definition_name(definition_name))
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -46,8 +123,46 @@ def _to_float(value: Any) -> Optional[float]:
     return None
 
 
-def _extract_machine_dimension(def_json: Dict[str, Any], key: str) -> Optional[float]:
-    value = _get_override_value(def_json, key, None)
+def _resolve_inherited_override_value(
+    definition_name: str,
+    key: str,
+    definition_index: Dict[str, Path],
+) -> Any:
+    """
+    Resolve a Cura setting value from a definition, following its inheritance chain.
+    """
+    visited: Set[str] = set()
+    current_name = _normalize_definition_name(definition_name)
+
+    while current_name and current_name not in visited:
+        visited.add(current_name)
+        current_path = _resolve_definition_path(current_name, definition_index)
+        if not current_path:
+            break
+
+        current_json = _load_json(current_path)
+        if not current_json:
+            break
+
+        value = _get_override_value(current_json, key, None)
+        if value is not None:
+            return value
+
+        inherits = current_json.get("inherits")
+        if not isinstance(inherits, str) or not inherits.strip():
+            break
+
+        current_name = _normalize_definition_name(inherits)
+
+    return None
+
+
+def _extract_machine_dimension(
+    definition_name: str,
+    key: str,
+    definition_index: Dict[str, Path],
+) -> Optional[float]:
+    value = _resolve_inherited_override_value(definition_name, key, definition_index)
     return _to_float(value)
 
 
@@ -71,7 +186,8 @@ def list_printers() -> List[Dict[str, Any]]:
     """
     printers: List[Dict[str, Any]] = []
 
-    if not DEFINITIONS_DIR.exists():
+    definition_index = _build_definition_index()
+    if not definition_index:
         return printers
 
     ignored_files = {
@@ -81,17 +197,19 @@ def list_printers() -> List[Dict[str, Any]]:
         "fdmextruder_errata.def.json",
     }
 
-    for def_path in sorted(DEFINITIONS_DIR.glob("*.def.json")):
-        if def_path.name in ignored_files:
+    for def_name in sorted(definition_index.keys()):
+        if def_name in ignored_files:
             continue
+
+        def_path = definition_index[def_name]
 
         def_json = _load_json(def_path)
         if not def_json:
             continue
 
-        width = _extract_machine_dimension(def_json, "machine_width")
-        depth = _extract_machine_dimension(def_json, "machine_depth")
-        height = _extract_machine_dimension(def_json, "machine_height")
+        width = _extract_machine_dimension(def_name, "machine_width", definition_index)
+        depth = _extract_machine_dimension(def_name, "machine_depth", definition_index)
+        height = _extract_machine_dimension(def_name, "machine_height", definition_index)
 
         if width is None or depth is None or height is None:
             continue
@@ -217,17 +335,18 @@ def slice_stl_to_gcode(
     final_settings = normalize_settings(final_settings)
     
     # Resolve definition stack for this printer
-    printer_def_path = DEFINITIONS_DIR / printer_definition
-    base_def_path = DEFINITIONS_DIR / "fdmprinter.def.json"
+    definition_index = _build_definition_index()
+    printer_def_path = _resolve_definition_path(printer_definition, definition_index)
+    base_def_path = _resolve_definition_path("fdmprinter.def.json", definition_index)
     # Ender-3 V3 KE uses this extruder definition in Cura 5.11
     extruder_def_path = EXTRUDERS_DIR / "creality_base_extruder_0.def.json"
     # Parent extruder definition referenced by the machine extruder
     # Note: base fdmextruder is located under definitions in Cura resources
-    fdm_extruder_base_path = DEFINITIONS_DIR / "fdmextruder.def.json"
+    fdm_extruder_base_path = _resolve_definition_path("fdmextruder.def.json", definition_index)
 
     # Sanity checks for all needed files (exclude .inst.cfg quality which isn't JSON)
     for p in (base_def_path, printer_def_path, fdm_extruder_base_path, extruder_def_path):
-        if not p.exists():
+        if not p or not p.exists():
             raise FileNotFoundError(f"Required definition file not found: {p}")
 
     # Build CuraEngine command with *all* definitions

@@ -76,6 +76,13 @@ Set the API URLs for the browser in [frontend/next.config.ts](frontend/next.conf
 
 Note: If not using Docker, you’ll need OpenSCAD and CuraEngine installed locally (or adapt paths). The Docker route is simpler because it packages those CLIs for you.
 
+Printer discovery for profile settings (`GET /printers`) now checks:
+- Bundled Cura resources from `CURA_RESOURCES` (defaults to `/opt/cura-resources`).
+- User/downstream definitions from `CURA_USER_RESOURCES` (path list of resource roots; each root should contain `definitions/`).
+- Explicit definition folders from `CURA_DEFINITIONS_DIRS` (path list of directories containing `.def.json` files).
+
+Use `CURA_USER_RESOURCES` or `CURA_DEFINITIONS_DIRS` when you want downloaded/custom Cura printer definitions to appear in the frontend printer selector and auto-fill build volume dimensions.
+
 ## Usage Examples
 List templates:
 
