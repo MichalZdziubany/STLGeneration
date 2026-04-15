@@ -49,7 +49,7 @@ export default function ExampleTemplatesPage() {
   return (
     <main className={landingStyles.container}>
       <header className={landingStyles.navbar}>
-        <h1 className={landingStyles.logo}>STL GENERATION</h1>
+        <h1 className={landingStyles.logo}>ParamPrint Studio</h1>
         <nav className={landingStyles.navLinks}>
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>

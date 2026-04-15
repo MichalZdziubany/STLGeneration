@@ -4,14 +4,14 @@ import landingStyles from "../LandingPage.module.css";
 import styles from "../ContentPage.module.css";
 
 export const metadata = {
-  title: "Privacy Policy | STL Generation",
+  title: "Privacy Policy | ParamPrint Studio",
 };
 
 export default function PrivacyPage() {
   return (
     <main className={landingStyles.container}>
       <header className={landingStyles.navbar}>
-        <h1 className={landingStyles.logo}>STL GENERATION</h1>
+        <h1 className={landingStyles.logo}>ParamPrint Studio</h1>
         <nav className={landingStyles.navLinks}>
           <Link href="/">Home</Link>
           <Link href="/templates">Templates</Link>

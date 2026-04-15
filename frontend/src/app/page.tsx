@@ -174,7 +174,7 @@ export default function Home() {
     <main className={styles.container}>
       {/* NAVBAR */}
       <header className={styles.navbar}>
-        <h1 className={styles.logo}>STL GENERATION</h1>
+        <h1 className={styles.logo}>ParamPrint Studio</h1>
 
         <nav className={styles.navLinks}>
           <Link href="/">Home</Link>
