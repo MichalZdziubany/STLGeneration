@@ -426,6 +426,7 @@ export default function ClientPage() {
             headers,
             body: JSON.stringify({
               ...payload,
+              track_history: false,
               params: {
                 ...normalized,
                 PART_MODE: part,
@@ -466,7 +467,10 @@ export default function ClientPage() {
       const res = await fetch(`${apiBaseUrl}/generate-stl`, {
         method: "POST",
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          track_history: false,
+        }),
         signal,
       });
 

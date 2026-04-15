@@ -28,6 +28,10 @@ class GenerateRequest(BaseModel):
         default="PART_MODE",
         description="Template parameter used as part selector.",
     )
+    track_history: bool = Field(
+        default=True,
+        description="When false, skip persisting this run in history (used for live previews).",
+    )
 
 
 router = APIRouter()
@@ -60,31 +64,32 @@ def route_generate_stl(
         stl_path = generate_stl_from_scad_code(payload.scad_code, payload.params)
         
         if stl_path and stl_path.exists():
-            record_run(
-                {
-                    "user_id": final_user_id,
-                    "operation": "generate_stl",
-                    "template_id": payload.template_id,
-                    "template_file": None,
-                    "template_source": "scad_code",
-                    "params": payload.params,
-                    "profile": None,
-                    "slice_settings": None,
-                    "effective_slice_settings": None,
-                    "printer_definition": None,
-                    "multi_part": False,
-                    "parts": [],
-                    "part_selector_param": payload.part_selector_param,
-                    "outputs": [
-                        {
-                            "type": "stl",
-                            "filename": stl_path.name,
-                            "path": str(stl_path),
-                            "size_bytes": stl_path.stat().st_size,
-                        }
-                    ],
-                }
-            )
+            if payload.track_history:
+                record_run(
+                    {
+                        "user_id": final_user_id,
+                        "operation": "generate_stl",
+                        "template_id": payload.template_id,
+                        "template_file": None,
+                        "template_source": "scad_code",
+                        "params": payload.params,
+                        "profile": None,
+                        "slice_settings": None,
+                        "effective_slice_settings": None,
+                        "printer_definition": None,
+                        "multi_part": False,
+                        "parts": [],
+                        "part_selector_param": payload.part_selector_param,
+                        "outputs": [
+                            {
+                                "type": "stl",
+                                "filename": stl_path.name,
+                                "path": str(stl_path),
+                                "size_bytes": stl_path.stat().st_size,
+                            }
+                        ],
+                    }
+                )
             return Response(content=stl_path.read_bytes(), media_type="model/stl")
         
         raise HTTPException(status_code=500, detail="Failed to generate STL from SCAD code")
@@ -116,6 +121,43 @@ def route_generate_stl(
             for stl_path in stl_paths:
                 zf.writestr(stl_path.name, stl_path.read_bytes())
 
+        if payload.track_history:
+            record_run(
+                {
+                    "user_id": final_user_id,
+                    "operation": "generate_stl",
+                    "template_id": template["id"],
+                    "template_file": template["file"],
+                    "template_source": "template_id",
+                    "params": payload.params,
+                    "profile": None,
+                    "slice_settings": None,
+                    "effective_slice_settings": None,
+                    "printer_definition": None,
+                    "multi_part": True,
+                    "parts": payload.parts,
+                    "part_selector_param": payload.part_selector_param,
+                    "outputs": [
+                        {
+                            "type": "stl",
+                            "filename": stl_path.name,
+                            "path": str(stl_path),
+                            "size_bytes": stl_path.stat().st_size,
+                        }
+                        for stl_path in stl_paths
+                    ],
+                }
+            )
+
+        zip_name = f"{template['id']}-stls.zip"
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+        )
+    
+    stl_path = generate_stl(template["file"], payload.params)
+    if payload.track_history:
         record_run(
             {
                 "user_id": final_user_id,
@@ -128,8 +170,8 @@ def route_generate_stl(
                 "slice_settings": None,
                 "effective_slice_settings": None,
                 "printer_definition": None,
-                "multi_part": True,
-                "parts": payload.parts,
+                "multi_part": False,
+                "parts": [],
                 "part_selector_param": payload.part_selector_param,
                 "outputs": [
                     {
@@ -138,42 +180,7 @@ def route_generate_stl(
                         "path": str(stl_path),
                         "size_bytes": stl_path.stat().st_size,
                     }
-                    for stl_path in stl_paths
                 ],
             }
         )
-
-        zip_name = f"{template['id']}-stls.zip"
-        return Response(
-            content=zip_buffer.getvalue(),
-            media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
-        )
-    
-    stl_path = generate_stl(template["file"], payload.params)
-    record_run(
-        {
-            "user_id": final_user_id,
-            "operation": "generate_stl",
-            "template_id": template["id"],
-            "template_file": template["file"],
-            "template_source": "template_id",
-            "params": payload.params,
-            "profile": None,
-            "slice_settings": None,
-            "effective_slice_settings": None,
-            "printer_definition": None,
-            "multi_part": False,
-            "parts": [],
-            "part_selector_param": payload.part_selector_param,
-            "outputs": [
-                {
-                    "type": "stl",
-                    "filename": stl_path.name,
-                    "path": str(stl_path),
-                    "size_bytes": stl_path.stat().st_size,
-                }
-            ],
-        }
-    )
     return Response(content=stl_path.read_bytes(), media_type="model/stl")
