@@ -1,0 +1,24 @@
+{
+  "name": "Detail Quality",
+  "description": "Higher-detail preset for cleaner surfaces and finer geometry.",
+  "metadata": {
+    "printer_definition": "creality_ender3v3ke.def.json",
+    "guided_order": 20,
+    "guided_default": false,
+    "guided_tag": "quality"
+  },
+  "settings": {
+    "layer_height": 0.12,
+    "wall_line_count": 3,
+    "top_layers": 6,
+    "bottom_layers": 5,
+    "infill_sparse_density": 20,
+    "speed_print": 45,
+    "speed_travel": 150,
+    "material_print_temperature_layer_0": 210,
+    "material_print_temperature": 210,
+    "material_bed_temperature_layer_0": 60,
+    "material_bed_temperature": 60,
+    "adhesion_type": "none"
+  }
+}

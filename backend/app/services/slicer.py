@@ -294,6 +294,54 @@ def normalize_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     return normalize_values(settings, bool_to_lower=True, skip_none=True, skip_empty_str=True)
 
 
+def _sanitize_gcode_comment_value(value: Any) -> str:
+    return str(value).replace("\r", " ").replace("\n", " ").strip()
+
+
+def _build_applied_settings_block(
+    profile: str,
+    printer_definition: str,
+    settings: Dict[str, Any],
+) -> str:
+    """
+    Build a deterministic G-code header block so applied preset values are visible
+    in the exported file and critical machine settings are explicitly set.
+    """
+    lines = [
+        "; --- APPLIED SLICER PRESET START ---",
+        f"; profile={_sanitize_gcode_comment_value(profile)}",
+        f"; printer_definition={_sanitize_gcode_comment_value(printer_definition)}",
+    ]
+
+    for key in sorted(settings.keys()):
+        value = settings[key]
+        lines.append(f"; setting.{key}={_sanitize_gcode_comment_value(value)}")
+
+    nozzle_temp = _to_float(
+        settings.get("material_print_temperature_layer_0", settings.get("material_print_temperature"))
+    )
+    bed_temp = _to_float(
+        settings.get("material_bed_temperature_layer_0", settings.get("material_bed_temperature"))
+    )
+    print_speed = _to_float(settings.get("speed_print", settings.get("print_speed")))
+
+    if nozzle_temp is not None:
+        rounded_nozzle = int(round(nozzle_temp))
+        lines.append(f"M104 S{rounded_nozzle}")
+        lines.append(f"M109 S{rounded_nozzle}")
+
+    if bed_temp is not None:
+        rounded_bed = int(round(bed_temp))
+        lines.append(f"M140 S{rounded_bed}")
+        lines.append(f"M190 S{rounded_bed}")
+
+    if print_speed is not None and print_speed > 0:
+        lines.append(f"G1 F{int(round(print_speed * 60.0))}")
+
+    lines.append("; --- APPLIED SLICER PRESET END ---")
+    return "\n".join(lines) + "\n"
+
+
 def slice_stl_to_gcode(
     stl_path: Path,
     settings: Optional[Dict[str, Any]] = None,
@@ -360,7 +408,6 @@ def slice_stl_to_gcode(
         "-j", str(extruder_def_path),
         "-j", str(printer_def_path),
         "-o", str(gcode_path),
-        "-l", str(stl_path),
     ]
     
     # CuraEngine 5.12 introduces derived settings (e.g., roofing/flooring_*),
@@ -368,6 +415,10 @@ def slice_stl_to_gcode(
     # If your profiles already define these, you can remove these fallbacks.
     final_settings.setdefault("roofing_layer_count", 0)
     final_settings.setdefault("flooring_layer_count", 0)
+
+    # Keep initial layer height aligned with selected preset unless caller sets it.
+    if "layer_height" in final_settings and "layer_height_0" not in final_settings:
+        final_settings["layer_height_0"] = final_settings["layer_height"]
 
     # Add settings overrides as -s parameters
     # The definition file provides all required defaults
@@ -379,6 +430,9 @@ def slice_stl_to_gcode(
         else:
             safe_val = str(value)
         command.extend(["-s", f"{key}={safe_val}"])
+
+    # Load the model after settings so per-slice overrides are applied.
+    command.extend(["-l", str(stl_path)])
     
     # Set environment variable for CuraEngine to find definitions, materials, quality profiles
     resources_root = get_cura_resources_root()
@@ -400,7 +454,7 @@ def slice_stl_to_gcode(
         if not gcode_path.exists():
             raise FileNotFoundError(f"G-code file not generated: {gcode_path}")
         
-        # Post-process: Replace temperature placeholder in start G-code
+        # Post-process: Replace start-script placeholder and stamp applied settings
         try:
             with open(gcode_path, 'r', encoding='utf-8', errors='ignore') as f:
                 gcode_text = f.read()
@@ -410,6 +464,15 @@ def slice_stl_to_gcode(
                 "M109 S{material_print_temperature_layer_0}",
                 f"M109 S{temp}"
             )
+
+            marker = "; --- APPLIED SLICER PRESET START ---"
+            if marker not in modified:
+                applied_block = _build_applied_settings_block(
+                    profile=profile,
+                    printer_definition=printer_definition,
+                    settings=final_settings,
+                )
+                modified = applied_block + modified
             
             if modified != gcode_text:
                 with open(gcode_path, 'w', encoding='utf-8') as f:
@@ -478,6 +541,13 @@ def list_settings_profiles() -> list[Dict[str, Any]]:
             })
         except Exception:
             continue
+
+    profiles.sort(
+        key=lambda p: (
+            p.get("metadata", {}).get("guided_order", 999),
+            p.get("name", "").lower(),
+        )
+    )
     
     return profiles
 

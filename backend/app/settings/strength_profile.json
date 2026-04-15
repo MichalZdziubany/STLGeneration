@@ -1,0 +1,24 @@
+{
+  "name": "Strength",
+  "description": "Stronger preset with thicker shells and denser infill for functional parts.",
+  "metadata": {
+    "printer_definition": "creality_ender3v3ke.def.json",
+    "guided_order": 30,
+    "guided_default": false,
+    "guided_tag": "strength"
+  },
+  "settings": {
+    "layer_height": 0.2,
+    "wall_line_count": 4,
+    "top_layers": 6,
+    "bottom_layers": 5,
+    "infill_sparse_density": 45,
+    "speed_print": 50,
+    "speed_travel": 150,
+    "material_print_temperature_layer_0": 220,
+    "material_print_temperature": 220,
+    "material_bed_temperature_layer_0": 65,
+    "material_bed_temperature": 65,
+    "adhesion_type": "none"
+  }
+}

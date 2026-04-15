@@ -1,0 +1,24 @@
+{
+  "name": "Draft Fast",
+  "description": "Fast, low-detail preset for quick fit checks and early prototypes.",
+  "metadata": {
+    "printer_definition": "creality_ender3v3ke.def.json",
+    "guided_order": 10,
+    "guided_default": false,
+    "guided_tag": "speed"
+  },
+  "settings": {
+    "layer_height": 0.28,
+    "wall_line_count": 2,
+    "top_layers": 3,
+    "bottom_layers": 3,
+    "infill_sparse_density": 10,
+    "speed_print": 90,
+    "speed_travel": 180,
+    "material_print_temperature_layer_0": 220,
+    "material_print_temperature": 220,
+    "material_bed_temperature_layer_0": 60,
+    "material_bed_temperature": 60,
+    "adhesion_type": "skirt"
+  }
+}

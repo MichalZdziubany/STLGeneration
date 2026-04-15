@@ -23,6 +23,14 @@ type TemplateCard = {
   isPublic?: boolean;
 };
 
+type SliceProfile = {
+  id: string;
+  name: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  file?: string;
+};
+
 export default function ClientPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id");
@@ -42,6 +50,10 @@ export default function ClientPage() {
   const [generating, setGenerating] = useState(false);
   const [slicing, setSlicing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>("Ready");
+  const [sliceProfiles, setSliceProfiles] = useState<SliceProfile[]>([]);
+  const [sliceProfilesLoading, setSliceProfilesLoading] = useState(false);
+  const [selectedSliceProfileId, setSelectedSliceProfileId] = useState<string>("balanced_profile");
+  const [adhesionMode, setAdhesionMode] = useState<string>("preset");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [threadedPreviewUrls, setThreadedPreviewUrls] = useState<{ bolt: string | null; nut: string | null }>({
     bolt: null,
@@ -168,7 +180,48 @@ export default function ClientPage() {
     };
   }, [apiBaseUrl, user?.uid]);
 
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      setSliceProfilesLoading(true);
+      try {
+        const res = await fetch(`${apiBaseUrl}/profiles`);
+        if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+
+        const payload = await res.json();
+        if (!alive) return;
+
+        const profiles: SliceProfile[] = payload.profiles ?? [];
+        setSliceProfiles(profiles);
+
+        const availableIds = new Set(profiles.map((p) => p.id));
+        const guidedDefault = profiles.find((p) => p.metadata?.guided_default === true)?.id;
+        const fallback = guidedDefault ?? (availableIds.has("balanced_profile") ? "balanced_profile" : profiles[0]?.id ?? "balanced_profile");
+
+        setSelectedSliceProfileId((prev) => (availableIds.has(prev) ? prev : fallback));
+      } catch {
+        if (!alive) return;
+        setSliceProfiles([]);
+        setSelectedSliceProfileId("balanced_profile");
+      } finally {
+        if (alive) {
+          setSliceProfilesLoading(false);
+        }
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [apiBaseUrl]);
+
   const selected = useMemo(() => templates.find((t) => t.id === selectedId) ?? null, [templates, selectedId]);
+  const selectedSliceProfile = useMemo(
+    () => sliceProfiles.find((p) => p.id === selectedSliceProfileId) ?? null,
+    [sliceProfiles, selectedSliceProfileId]
+  );
   const isThreadedNutBoltTemplate = useMemo(
     () => !!selected && !isUserTemplate(selected) && selected.id === "threaded_nut_bolt",
     [selected]
@@ -426,8 +479,8 @@ export default function ClientPage() {
 
       let slicePayload: Record<string, any> = {
         params: normalized,
-        slice_settings: null,
-        profile: "balanced_profile",
+        slice_settings: adhesionMode === "preset" ? null : { adhesion_type: adhesionMode },
+        profile: selectedSliceProfileId,
         user_id: user?.uid,
       };
 
@@ -445,7 +498,9 @@ export default function ClientPage() {
         slicePayload.part_selector_param = "PART_MODE";
       }
 
-      setStatusMsg("Slicing to G-code…");
+      setStatusMsg(
+        `Slicing to G-code using ${selectedSliceProfile?.name ?? selectedSliceProfileId} preset…`
+      );
       const res = await fetch(`${apiBaseUrl}/slice`, {
         method: "POST",
         headers,
@@ -579,6 +634,54 @@ export default function ClientPage() {
                         })()}
                       </div>
                     ))}
+
+                  <div className={styles.sliceOptionsRow}>
+                    <div className={styles.slicePresetBox}>
+                      <label htmlFor="slice-profile">Guided slicer preset</label>
+                      <select
+                        id="slice-profile"
+                        className={styles.input}
+                        value={selectedSliceProfileId}
+                        onChange={(e) => setSelectedSliceProfileId(e.target.value)}
+                        disabled={sliceProfilesLoading || sliceProfiles.length === 0}
+                      >
+                        {sliceProfiles.length > 0 ? (
+                          sliceProfiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {profile.name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="balanced_profile">Balanced Profile</option>
+                        )}
+                      </select>
+                      <p className={styles.slicePresetHelp}>
+                        {sliceProfilesLoading
+                          ? "Loading slicer presets…"
+                          : selectedSliceProfile?.description ||
+                            "Preset values are merged into slicing settings and recorded in the output G-code header."}
+                      </p>
+                    </div>
+
+                    <div className={styles.slicePresetBox}>
+                      <label htmlFor="adhesion-mode">Optional adhesion</label>
+                      <select
+                        id="adhesion-mode"
+                        className={styles.input}
+                        value={adhesionMode}
+                        onChange={(e) => setAdhesionMode(e.target.value)}
+                      >
+                        <option value="preset">Use preset default</option>
+                        <option value="none">None</option>
+                        <option value="skirt">Skirt</option>
+                        <option value="brim">Brim</option>
+                        <option value="raft">Raft</option>
+                      </select>
+                      <p className={styles.slicePresetHelp}>
+                        Overrides adhesion only for this slice operation.
+                      </p>
+                    </div>
+                  </div>
 
                   <div className={styles.actions}>
                     <button type="submit" className={styles.primaryBtn} disabled={generating}>
