@@ -7,6 +7,7 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/jobs:/app/jobs
+      - backend_user_templates:/app/app/user_templates
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -29,4 +30,5 @@ services:
 volumes:
   frontend_node_modules:
   frontend_next:
+  backend_user_templates:
 

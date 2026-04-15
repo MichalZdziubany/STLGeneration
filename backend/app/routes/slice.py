@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 from io import BytesIO
 import zipfile
+import logging
 
 from fastapi import APIRouter, HTTPException, Response, Header
 from pydantic import BaseModel, Field
@@ -81,6 +82,7 @@ class SliceSTLRequest(BaseModel):
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/slice")
@@ -160,6 +162,7 @@ def route_slice_model(
                 }
             )
         except Exception as e:
+            logger.exception("Slicing failed for scad_code payload")
             raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
     
     # Otherwise use template_id (built-in templates)
@@ -224,6 +227,7 @@ def route_slice_model(
                 }
             )
         except Exception as e:
+            logger.exception("Slicing failed for multi_part payload")
             raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
 
         zip_buffer = BytesIO()
@@ -286,6 +290,7 @@ def route_slice_model(
             }
         )
     except Exception as e:
+        logger.exception("Slicing failed for template payload")
         raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
 
 
@@ -348,6 +353,7 @@ def route_slice_existing_stl(payload: SliceSTLRequest):
             }
         )
     except Exception as e:
+        logger.exception("Slicing existing STL failed")
         raise HTTPException(status_code=500, detail=f"Slicing failed: {str(e)}")
 
 

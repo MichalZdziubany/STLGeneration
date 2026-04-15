@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "../LandingPage.module.css";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchAllAvailableTemplates } from "@/lib/firestore";
 
 type TemplateCard = {
   id: string;
   name: string;
-  geometry: string;
-  file: string;
+  geometry?: string;
+  file?: string;
   description: string;
   parameters: string[];
   tags: string[];
@@ -16,6 +18,8 @@ type TemplateCard = {
 };
 
 export default function TemplatesPage() {
+  const { user } = useAuth();
+
   const apiBaseUrl = useMemo(() => {
     const serverDefault = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     if (typeof window === "undefined") return serverDefault;
@@ -32,13 +36,25 @@ export default function TemplatesPage() {
       setStatus("loading");
       setMessage("Fetching templates...");
       try {
-        const res = await fetch(`${apiBaseUrl}/templates`);
+        const headers: HeadersInit = {};
+        if (user?.uid) {
+          headers["user-id"] = user.uid;
+        }
+
+        const res = await fetch(`${apiBaseUrl}/templates`, { headers });
         if (!res.ok) throw new Error(`Backend returned ${res.status}`);
         const payload = await res.json();
         if (!alive) return;
-        const list: TemplateCard[] = payload.templates ?? [];
-        setTemplates(list);
+        const backendTemplates: TemplateCard[] = payload.templates ?? [];
+
+        // Prioritize local backend templates for initial render.
+        setTemplates(backendTemplates);
         setStatus("ready");
+
+        // Then merge in user-uploaded Firestore templates.
+        const list: TemplateCard[] = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
+        if (!alive) return;
+        setTemplates(list);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unable to load templates";
         if (!alive) return;
@@ -50,7 +66,7 @@ export default function TemplatesPage() {
     return () => {
       alive = false;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, user?.uid]);
 
   return (
     <main className={styles.container}>

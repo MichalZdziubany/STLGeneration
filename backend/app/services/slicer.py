@@ -3,6 +3,7 @@ import subprocess
 import json
 import re
 import os
+import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Set
 
@@ -22,6 +23,31 @@ EXTRUDERS_DIR = get_cura_resources_root() / "extruders"
 # Note: CuraEngine expects JSON definition/resolved settings via -j/-r.
 #       .inst.cfg files are NOT JSON and cannot be passed to -j directly.
 QUALITY_DIR = get_cura_resources_root() / "quality"
+
+
+def _resolve_curaengine_binary() -> str:
+    """Resolve the CuraEngine executable path reliably inside container/runtime."""
+    explicit = os.getenv("CURA_ENGINE_BIN")
+    if explicit:
+        explicit_path = Path(explicit)
+        if explicit_path.exists() and explicit_path.is_file():
+            return str(explicit_path)
+
+    candidates = [
+        Path("/opt/CuraEngine/build/Release/CuraEngine"),
+        Path("/opt/CuraEngine/build/CuraEngine"),
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+
+    discovered = shutil.which("CuraEngine")
+    if discovered:
+        return discovered
+
+    raise FileNotFoundError(
+        "CuraEngine executable not found. Set CURA_ENGINE_BIN or ensure CuraEngine is installed in the backend container."
+    )
 
 
 def _split_path_list(value: Optional[str]) -> List[Path]:
@@ -398,8 +424,9 @@ def slice_stl_to_gcode(
             raise FileNotFoundError(f"Required definition file not found: {p}")
 
     # Build CuraEngine command with *all* definitions
+    cura_engine_bin = _resolve_curaengine_binary()
     command = [
-        "CuraEngine",
+        cura_engine_bin,
         "slice",
         "-v",
         # Load base printer and base extruder first, then specific extruder, then printer
@@ -415,6 +442,8 @@ def slice_stl_to_gcode(
     # If your profiles already define these, you can remove these fallbacks.
     final_settings.setdefault("roofing_layer_count", 0)
     final_settings.setdefault("flooring_layer_count", 0)
+    # Required by some machine definitions during gcode export.
+    final_settings.setdefault("initial_extruder_nr", 0)
 
     # Keep initial layer height aligned with selected preset unless caller sets it.
     if "layer_height" in final_settings and "layer_height_0" not in final_settings:
@@ -483,7 +512,12 @@ def slice_stl_to_gcode(
         return gcode_path
         
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"CuraEngine slicing failed: {e.stderr}")
+        stderr = (e.stderr or "").strip()
+        stdout = (e.stdout or "").strip()
+        details = stderr or stdout or "No output from CuraEngine"
+        raise RuntimeError(
+            f"CuraEngine slicing failed (exit code {e.returncode}). Command: {' '.join(command)}. Output: {details}"
+        )
 
 
 def slice_model(

@@ -11,6 +11,38 @@ interface ExtractedParameter {
   default: any;
 }
 
+function formatApiErrorDetail(detail: unknown): string {
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          const maybeMsg = (item as { msg?: unknown }).msg;
+          if (typeof maybeMsg === "string") return maybeMsg;
+        }
+        return "";
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) {
+      return messages.join("; ");
+    }
+  }
+
+  if (detail && typeof detail === "object") {
+    const maybeMsg = (detail as { msg?: unknown }).msg;
+    if (typeof maybeMsg === "string") {
+      return maybeMsg;
+    }
+  }
+
+  return "Upload failed";
+}
+
 export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }) {
   const { user } = useAuth();
   const apiBaseUrl = useMemo(() => {
@@ -178,25 +210,47 @@ export default function TemplateUpload({ onSuccess }: { onSuccess?: () => void }
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Upload failed");
+        let payload: unknown = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        const detail =
+          payload && typeof payload === "object"
+            ? (payload as { detail?: unknown }).detail
+            : null;
+
+        throw new Error(formatApiErrorDetail(detail));
       }
 
       const result = await response.json();
       const templateId = result.template.id;
 
-      // Save to Firestore
-      await saveTemplateToFirestore(user.uid, {
-        id: templateId,
-        userId: user.uid,
-        name: templateName,
-        description: description,
-        isPublic: isPublic,
-        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
-        jsFile: `user-templates/${user.uid}/${templateId}/template.scad.j2`,
-      });
+      let firestoreSynced = true;
+      try {
+        // Save to Firestore (best effort)
+        await saveTemplateToFirestore(user.uid, {
+          id: templateId,
+          userId: user.uid,
+          name: templateName,
+          description: description,
+          isPublic: isPublic,
+          tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+          jsFile: `user-templates/${user.uid}/${templateId}/template.scad.j2`,
+          templateContent,
+        });
+      } catch {
+        firestoreSynced = false;
+      }
 
-      setMessage({ type: "success", text: "Template uploaded successfully!" });
+      setMessage({
+        type: "success",
+        text: firestoreSynced
+          ? "Template uploaded successfully!"
+          : "Template uploaded locally. Firestore sync was blocked by permissions.",
+      });
       
       // Reset form
       setFile(null);

@@ -4,20 +4,25 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./LandingPage.module.css";
 import Link from "next/link";
 import AuthNavLink from "@/components/AuthNavLink";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchAllAvailableTemplates } from "@/lib/firestore";
 
 type TemplateCard = {
   id: string;
   name: string;
-  geometry: string;
-  file: string;
+  geometry?: string;
+  file?: string;
   description: string;
   parameters: string[];
   tags: string[];
   dimensions?: string;
   link?: string;
+  userId?: string;
 };
 
 export default function Home() {
+  const { user } = useAuth();
+
   const apiBaseUrl = useMemo(() => {
     const serverDefault = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -45,7 +50,12 @@ export default function Home() {
       setTemplateMessage("Fetching templates...");
 
       try {
-        const response = await fetch(`${apiBaseUrl}/templates`);
+        const headers: HeadersInit = {};
+        if (user?.uid) {
+          headers["user-id"] = user.uid;
+        }
+
+        const response = await fetch(`${apiBaseUrl}/templates`, { headers });
 
         if (!response.ok) {
           throw new Error(`Backend returned ${response.status}`);
@@ -53,8 +63,16 @@ export default function Home() {
 
         const payload = await response.json();
         if (isMounted) {
-          setTemplates(payload.templates ?? []);
+          const backendTemplates: TemplateCard[] = payload.templates ?? [];
+
+          // Prioritize local backend templates for initial render.
+          setTemplates(backendTemplates);
           setTemplateStatus("ready");
+
+          // Then merge in user-uploaded Firestore templates.
+          const mergedTemplates = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
+          if (!isMounted) return;
+          setTemplates(mergedTemplates);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load templates";
@@ -70,7 +88,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, user?.uid]);
 
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedTemplateId) ?? null,
@@ -223,7 +241,10 @@ export default function Home() {
 
         {templateStatus === "ready" &&
           templates.map((template: TemplateCard) => (
-            <article key={template.id} className={styles.templateCard}>
+            <article
+              key={`${template.id}-${template.userId ?? "local"}-${template.file ?? "nofile"}`}
+              className={styles.templateCard}
+            >
               <h3 className={styles.templateName}>{template.name}</h3>
               <p className={styles.templateDescription}>{template.description}</p>
 

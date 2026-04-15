@@ -7,6 +7,7 @@ import StlPreview from "@/components/StlPreview";
 import AuthNavLink from "@/components/AuthNavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadEffectiveUserProfileSettings } from "@/lib/profile-settings";
+import { fetchAllAvailableTemplates, getTemplate as getFirestoreTemplate } from "@/lib/firestore";
 import landingStyles from "../LandingPage.module.css";
 import styles from "../DesignerPage.module.css";
 
@@ -21,6 +22,7 @@ type TemplateCard = {
   dimensions?: string;
   userId?: string;
   isPublic?: boolean;
+  templateContent?: string;
 };
 
 type SliceProfile = {
@@ -119,10 +121,17 @@ export default function ClientPage() {
 
       const owner = encodeURIComponent(ownerUserId);
       const res = await fetch(`${apiBaseUrl}/templates/${templateId}?owner_user_id=${owner}`, { headers });
-      if (!res.ok) return null;
+      if (res.ok) {
+        const data = await res.json();
+        return data.content || null;
+      }
 
-      const data = await res.json();
-      return data.content || null;
+      // Fallback for rebuilt containers where local template files are missing.
+      const firestoreTemplate = await getFirestoreTemplate(ownerUserId, templateId);
+      if (firestoreTemplate?.templateContent) {
+        return firestoreTemplate.templateContent;
+      }
+      return null;
     } catch (error) {
       console.error("Failed to fetch template content:", error);
       return null;
@@ -197,9 +206,17 @@ export default function ClientPage() {
         if (!res.ok) throw new Error(`Backend returned ${res.status}`);
         const payload = await res.json();
         if (!alive) return;
-        const list: TemplateCard[] = payload.templates ?? [];
-        setTemplates(list);
+        const backendTemplates: TemplateCard[] = payload.templates ?? [];
+
+        // Prioritize local backend templates for initial render.
+        setTemplates(backendTemplates);
         setStatus("ready");
+        setSelectedId((prev) => prev ?? (backendTemplates[0]?.id ?? null));
+
+        // Then merge in user-uploaded Firestore templates.
+        const list: TemplateCard[] = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
+        if (!alive) return;
+        setTemplates(list);
         setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unable to load templates";
@@ -847,7 +864,18 @@ export default function ClientPage() {
         body: JSON.stringify(slicePayload),
       });
 
-      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errorPayload = await res.json();
+          if (typeof errorPayload?.detail === "string") {
+            detail = errorPayload.detail;
+          }
+        } catch {
+          // Ignore JSON parsing failures and fall back to status-only message.
+        }
+        throw new Error(detail ? `Slice failed: ${detail}` : `Backend returned ${res.status}`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
 

@@ -26,6 +26,7 @@ export interface FirebaseTemplate {
   createdAt?: string;
   updatedAt?: string;
   jsFile?: string;
+  templateContent?: string;
 }
 
 export interface UserProfileSettings {
@@ -68,43 +69,56 @@ export async function saveTemplateToFirestore(
 export async function getUserTemplates(
   userId: string
 ): Promise<FirebaseTemplate[]> {
-  const templatesRef = collection(db, "templates", userId, "items");
-  const snapshot = await getDocs(templatesRef);
-  
-  return snapshot.docs.map(doc => {
-    const data = doc.data() as Omit<FirebaseTemplate, 'id'>;
-    return {
-      id: doc.id,
-      ...data,
-    } as FirebaseTemplate;
-  });
+  try {
+    const templatesRef = collection(db, "templates", userId, "items");
+    const snapshot = await getDocs(templatesRef);
+
+    return snapshot.docs.map(doc => {
+      const data = doc.data() as Omit<FirebaseTemplate, 'id'>;
+      return {
+        id: doc.id,
+        ...data,
+      } as FirebaseTemplate;
+    });
+  } catch {
+    // Firestore rules can block reads for unauthenticated or non-owner users.
+    return [];
+  }
 }
 
 /**
  * Get all public templates
  */
 export async function getPublicTemplates(): Promise<FirebaseTemplate[]> {
-  const templatesRef = collection(db, "templates");
-  const snapshot = await getDocs(templatesRef);
-  
-  const publicTemplates: FirebaseTemplate[] = [];
-  
-  for (const userDoc of snapshot.docs) {
-    const itemsRef = collection(db, "templates", userDoc.id, "items");
-    const itemsSnapshot = await getDocs(itemsRef);
-    
-    itemsSnapshot.docs.forEach(doc => {
-      const data = doc.data() as Omit<FirebaseTemplate, 'id'>;
-      if (data.isPublic) {
-        publicTemplates.push({
-          id: doc.id,
-          ...data,
-        } as FirebaseTemplate);
+  try {
+    const templatesRef = collection(db, "templates");
+    const snapshot = await getDocs(templatesRef);
+
+    const publicTemplates: FirebaseTemplate[] = [];
+
+    for (const userDoc of snapshot.docs) {
+      try {
+        const itemsRef = collection(db, "templates", userDoc.id, "items");
+        const itemsSnapshot = await getDocs(itemsRef);
+
+        itemsSnapshot.docs.forEach(doc => {
+          const data = doc.data() as Omit<FirebaseTemplate, 'id'>;
+          if (data.isPublic) {
+            publicTemplates.push({
+              id: doc.id,
+              ...data,
+            } as FirebaseTemplate);
+          }
+        });
+      } catch {
+        // Ignore users whose templates are not readable under current rules.
       }
-    });
+    }
+
+    return publicTemplates;
+  } catch {
+    return [];
   }
-  
-  return publicTemplates;
 }
 
 /**
@@ -114,18 +128,22 @@ export async function getTemplate(
   userId: string,
   templateId: string
 ): Promise<FirebaseTemplate | null> {
-  const docRef = doc(db, "templates", userId, "items", templateId);
-  const snapshot = await getDoc(docRef);
-  
-  if (snapshot.exists()) {
-    const data = snapshot.data() as Omit<FirebaseTemplate, 'id'>;
-    return {
-      id: snapshot.id,
-      ...data,
-    } as FirebaseTemplate;
+  try {
+    const docRef = doc(db, "templates", userId, "items", templateId);
+    const snapshot = await getDoc(docRef);
+
+    if (snapshot.exists()) {
+      const data = snapshot.data() as Omit<FirebaseTemplate, 'id'>;
+      return {
+        id: snapshot.id,
+        ...data,
+      } as FirebaseTemplate;
+    }
+
+    return null;
+  } catch {
+    return null;
   }
-  
-  return null;
 }
 
 /**
@@ -208,25 +226,30 @@ export async function fetchAllAvailableTemplates(
   userId: string | null,
   builtInTemplates: any[]
 ): Promise<any[]> {
-  let allTemplates = [...builtInTemplates];
-  
-  if (userId) {
-    // Add user's own templates
-    const userTemplates = await getUserTemplates(userId);
-    allTemplates = allTemplates.concat(userTemplates);
+  try {
+    let allTemplates = [...builtInTemplates];
+
+    if (userId) {
+      // Add user's own templates
+      const userTemplates = await getUserTemplates(userId);
+      allTemplates = allTemplates.concat(userTemplates);
+    }
+
+    // Add public templates
+    const publicTemplates = await getPublicTemplates();
+    allTemplates = allTemplates.concat(publicTemplates);
+
+    const seen = new Set<string>();
+    return allTemplates.filter(t => {
+      const dedupeKey = `${String(t.id)}::${String(t.userId ?? "")}`;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    });
+  } catch {
+    // Keep app usable even when Firestore is unavailable or blocked.
+    return [...builtInTemplates];
   }
-  
-  // Add public templates
-  const publicTemplates = await getPublicTemplates();
-  allTemplates = allTemplates.concat(publicTemplates);
-  
-  // Remove duplicates by id
-  const seen = new Set<string>();
-  return allTemplates.filter(t => {
-    if (seen.has(t.id)) return false;
-    seen.add(t.id);
-    return true;
-  });
 }
 
 /**
