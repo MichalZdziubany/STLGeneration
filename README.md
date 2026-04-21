@@ -180,7 +180,8 @@ curl -X POST http://localhost:8000/slice-stl \
 	- [backend/jobs](backend/jobs): Output files (SCAD/STL/G-code).
 - **Frontend**
 	- [frontend/src/app](frontend/src/app): Next.js app directory with pages.
-	- [frontend/lib/auth.ts](frontend/lib/auth.ts): Placeholder for future auth.
+	- [frontend/src/contexts/AuthContext.tsx](frontend/src/contexts/AuthContext.tsx): Firebase auth state and session context.
+	- [frontend/src/lib/auth.ts](frontend/src/lib/auth.ts): Auth helpers for sign-in, sign-up, and password reset.
 - **Container build files**
 	- [backend/Dockerfile](backend/Dockerfile)
 	- [frontend/Dockerfile](frontend/Dockerfile)
@@ -207,7 +208,7 @@ Notes:
 - More parametric templates (threads, brackets, hinges, LEGO-style bricks).
 - Profile editor in the UI; preview changes before slicing.
 - Inline 3D viewer for STL (WebGL/Three.js).
-- User accounts and saved jobs (see [frontend/lib/auth.ts](frontend/lib/auth.ts) for scaffolding).
+- Better account-level features (template sharing controls, richer run management, and profile sync UX).
 - Upload custom templates and share profiles.
 
 ## Acknowledgements
