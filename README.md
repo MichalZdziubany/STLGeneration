@@ -10,7 +10,7 @@ This is my final year project: a web app that lets you design simple parametric 
 ## What it does
 - Parametric model templates rendered via OpenSCAD.
 - Includes advanced multi-part templates like a matched threaded nut + bolt pair.
-- Server-side STL generation with sane defaults.
+- Server-side STL generation with practical defaults.
 - One-click slicing to G-code using profiles (e.g., balanced Ender 3 settings).
 - Minimal, clean UI built with Next.js.
 - FastAPI backend with simple JSON endpoints.
@@ -31,11 +31,15 @@ High-level flow:
 ## API Overview
 - `GET /` — health check.
 - `GET /templates` — list available templates with metadata.
+- `POST /templates/upload` — upload a user template (`.scad.j2`).
+- `GET /templates/{template_id}` — fetch template content + metadata.
 - `POST /generate-stl` — body: `{ template_id, params }` → returns binary STL.
 - `POST /slice` — body: `{ template_id, params, slice_settings?, profile? }` → returns G-code.
 - `POST /slice-stl` — body: `{ stl_filename, slice_settings?, profile? }` → returns G-code for an existing STL.
 - `POST /generate-stl` with `{ multi_part: true, parts: [...] }` — returns ZIP of multiple STLs rendered from one template.
 - `POST /slice` with `{ multi_part: true, parts: [...] }` — returns ZIP of multiple G-code files sliced from one template.
+- `GET /runs` — list recent generation/slicing runs.
+- `GET /runs/{run_id}` — fetch a single run record.
 - `GET /profiles` — list available slicing profiles.
 - `GET /profiles/{name}` — get full settings for a profile.
 - `GET /printers` — list Cura printer definitions and build volumes discovered from Cura resources.
@@ -70,7 +74,7 @@ npm install
 npm run dev
 ```
 
-Set the API URLs for the browser in [frontend/next.config.ts](frontend/next.config.ts) or via env:
+Set API URLs via environment variables:
 - `NEXT_PUBLIC_API_URL`: server-to-server (e.g., `http://localhost:8000` when running locally, or `http://backend:8000` in Docker)
 - `NEXT_PUBLIC_API_URL_BROWSER`: client-side calls (usually `http://localhost:8000`)
 
