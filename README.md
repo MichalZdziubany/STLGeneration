@@ -19,8 +19,7 @@ This is my final year project: a web app that lets you design simple parametric 
 ## Architecture
 - **Frontend (Next.js)**: User interface in [frontend](frontend).
 - **Backend (FastAPI)**: API endpoints in [backend/app](backend/app) with routes for templates, STL generation, and slicing.
-- **OpenSCAD service**: CLI used for rendering SCAD → STL. See [docker/openscad-service](docker/openscad-service).
-- **CuraEngine service**: CLI used for STL → G-code. See [docker/curaengine-service](docker/curaengine-service).
+- **OpenSCAD + CuraEngine CLIs**: Installed in the backend container image and invoked by backend services.
 - **Shared jobs folder**: Generated files live in [backend/jobs](backend/jobs) and are mounted into services.
 - **Settings & definitions**: Slicing profiles and printer definitions in [backend/app/settings](backend/app/settings).
 
@@ -171,20 +170,20 @@ curl -X POST http://localhost:8000/slice-stl \
 
 ## Project Structure
 - **Root**
-	- [docker-compose.yml](docker-compose.yml): Orchestrates backend, frontend, OpenSCAD, CuraEngine.
+	- [docker-compose.yml](docker-compose.yml): Orchestrates backend and frontend services.
 - **Backend**
 	- [backend/app/main.py](backend/app/main.py): FastAPI app setup + CORS.
 	- [backend/app/routes](backend/app/routes): `generate.py`, `slice.py`, `templates.py`.
 	- [backend/app/services](backend/app/services): STL generation, slicing, template catalog.
 	- [backend/app/settings](backend/app/settings): Profiles and printer definition files.
-	- [backend/templates](backend/templates): Jinja2 SCAD templates.
+	- [backend/app/templates](backend/app/templates): Jinja2 SCAD templates.
 	- [backend/jobs](backend/jobs): Output files (SCAD/STL/G-code).
 - **Frontend**
 	- [frontend/src/app](frontend/src/app): Next.js app directory with pages.
 	- [frontend/lib/auth.ts](frontend/lib/auth.ts): Placeholder for future auth.
-- **Docker services**
-	- [docker/openscad-service/Dockerfile](docker/openscad-service/Dockerfile)
-	- [docker/curaengine-service/Dockerfile](docker/curaengine-service/Dockerfile)
+- **Container build files**
+	- [backend/Dockerfile](backend/Dockerfile)
+	- [frontend/Dockerfile](frontend/Dockerfile)
 
 ## Testing
 Backend tests live in [backend/tests](backend/tests). To run locally:
