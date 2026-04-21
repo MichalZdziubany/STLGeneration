@@ -10,6 +10,8 @@ jobs:
   backend-tests:
     name: Backend Unit/API Tests
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/backend
 
     defaults:
       run:
