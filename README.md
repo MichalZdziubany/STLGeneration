@@ -51,6 +51,7 @@ docker compose up --build
 - Backend: http://localhost:8000
 
 The services share the [backend/jobs](backend/jobs) folder for generated files.
+User-uploaded template files are persisted in a Docker named volume (`backend_user_templates`) mounted to `/app/app/user_templates`, so they remain available across container rebuilds/recreates.
 
 ## Local Development (without Docker)
 Backend (FastAPI):
