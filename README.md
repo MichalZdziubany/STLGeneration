@@ -73,6 +73,19 @@ Set the API URLs for the browser in [frontend/next.config.ts](frontend/next.conf
 - `NEXT_PUBLIC_API_URL`: server-to-server (e.g., `http://localhost:8000` when running locally, or `http://backend:8000` in Docker)
 - `NEXT_PUBLIC_API_URL_BROWSER`: client-side calls (usually `http://localhost:8000`)
 
+The frontend also requires Firebase env vars (used for auth, Firestore, and storage). Add these to `frontend/.env.local`:
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+Optional:
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
+
+If any required Firebase vars are missing, the frontend throws an explicit startup error listing which keys are missing.
+
 Note: If not using Docker, you’ll need OpenSCAD and CuraEngine installed locally (or adapt paths). The Docker route is simpler because it packages those CLIs for you.
 
 Printer discovery for profile settings (`GET /printers`) now checks:
