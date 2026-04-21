@@ -3,3 +3,4 @@ uvicorn
 python-multipart
 pytest
 jinja2
+httpx

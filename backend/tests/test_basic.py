@@ -1,3 +1,11 @@
-#Basic test to verify that pytest and CI/CD are configured correctly.
-def test_example():
-    assert 2 + 2 == 4
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+def test_root_healthcheck():
+    client = TestClient(app)
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json().get("message")

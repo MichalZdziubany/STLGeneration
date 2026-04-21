@@ -33,8 +33,8 @@ def test_generate_stl_succeeds(tmp_path: Path, template_name: str, params: dict)
     if openscad_bin is None:
         pytest.skip("OpenSCAD CLI not found; skipping STL generation test.")
 
-    # Import the generator from the backend package
-    stl_gen = importlib.import_module("backend.app.services.stl_generator")
+    # Import the generator from the backend app package
+    stl_gen = importlib.import_module("app.services.stl_generator")
 
     # Redirect jobs dir to a temp path for isolated testing
     stl_gen.JOBS_DIR = tmp_path
