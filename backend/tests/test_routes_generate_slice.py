@@ -104,6 +104,7 @@ def test_slice_applies_material_preset(client, monkeypatch, tmp_path: Path):
         return stl_path, gcode_path
 
     monkeypatch.setattr(slice_route, "slice_model", fake_slice_model)
+    monkeypatch.setattr(slice_route, "record_run", lambda _payload: None)
 
     response = client.post(
         "/slice",
