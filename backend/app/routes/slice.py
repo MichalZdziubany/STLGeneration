@@ -12,6 +12,8 @@ from app.services.slicer import (
     list_settings_profiles,
     get_profile_settings,
     list_printers,
+    list_material_presets,
+    get_material_preset_settings,
     merge_settings,
     normalize_settings,
 )
@@ -53,6 +55,10 @@ class SliceRequest(BaseModel):
         default="balanced_profile",
         description="Settings profile to use (default: balanced_profile)"
     )
+    material_preset: str = Field(
+        default="preset",
+        description="Material preset to apply on top of the quality profile",
+    )
     user_id: Optional[str] = Field(None, description="User ID for user templates")
     scad_code: Optional[str] = Field(None, description="Pre-generated SCAD code (from user template execution)")
     multi_part: bool = Field(
@@ -79,10 +85,20 @@ class SliceSTLRequest(BaseModel):
         default="balanced_profile",
         description="Settings profile to use (default: balanced_profile)"
     )
+    material_preset: str = Field(
+        default="preset",
+        description="Material preset to apply on top of the quality profile",
+    )
 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _build_slice_overrides(payload: SliceRequest | SliceSTLRequest) -> Dict[str, Any]:
+    overrides: Dict[str, Any] = dict(payload.slice_settings or {})
+    material_settings = get_material_preset_settings(payload.material_preset)
+    return merge_settings(material_settings, overrides)
 
 
 @router.post("/slice")
@@ -117,10 +133,11 @@ def route_slice_model(
         
         # Then slice the STL to G-code
         try:
-            repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
+            merged_slice_settings = _build_slice_overrides(payload)
+            repro = _build_slice_repro_context(payload.profile, merged_slice_settings)
             gcode_path = slice_stl_to_gcode(
                 stl_path,
-                payload.slice_settings,
+                merged_slice_settings,
                 payload.profile
             )
             record_run(
@@ -132,7 +149,8 @@ def route_slice_model(
                     "template_source": "scad_code",
                     "params": payload.params,
                     "profile": repro["profile"],
-                    "slice_settings": repro["slice_settings"],
+                    "slice_settings": payload.slice_settings,
+                    "material_preset": payload.material_preset,
                     "effective_slice_settings": repro["effective_slice_settings"],
                     "printer_definition": repro["printer_definition"],
                     "multi_part": False,
@@ -178,7 +196,8 @@ def route_slice_model(
             raise HTTPException(status_code=400, detail="parts is required when multi_part=true")
 
         try:
-            repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
+            merged_slice_settings = _build_slice_overrides(payload)
+            repro = _build_slice_repro_context(payload.profile, merged_slice_settings)
             stl_paths = generate_multi_part_stls(
                 template["file"],
                 payload.params,
@@ -187,7 +206,7 @@ def route_slice_model(
             )
 
             gcode_paths = [
-                slice_stl_to_gcode(stl_path, payload.slice_settings, payload.profile)
+                slice_stl_to_gcode(stl_path, merged_slice_settings, payload.profile)
                 for stl_path in stl_paths
             ]
 
@@ -200,7 +219,8 @@ def route_slice_model(
                     "template_source": "template_id",
                     "params": payload.params,
                     "profile": repro["profile"],
-                    "slice_settings": repro["slice_settings"],
+                    "slice_settings": payload.slice_settings,
+                    "material_preset": payload.material_preset,
                     "effective_slice_settings": repro["effective_slice_settings"],
                     "printer_definition": repro["printer_definition"],
                     "multi_part": True,
@@ -243,11 +263,12 @@ def route_slice_model(
         )
 
     try:
-        repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
+        merged_slice_settings = _build_slice_overrides(payload)
+        repro = _build_slice_repro_context(payload.profile, merged_slice_settings)
         stl_path, gcode_path = slice_model(
             template["file"],
             payload.params,
-            payload.slice_settings,
+            merged_slice_settings,
             payload.profile
         )
         record_run(
@@ -259,7 +280,8 @@ def route_slice_model(
                 "template_source": "template_id",
                 "params": payload.params,
                 "profile": repro["profile"],
-                "slice_settings": repro["slice_settings"],
+                "slice_settings": payload.slice_settings,
+                "material_preset": payload.material_preset,
                 "effective_slice_settings": repro["effective_slice_settings"],
                 "printer_definition": repro["printer_definition"],
                 "multi_part": False,
@@ -306,10 +328,11 @@ def route_slice_existing_stl(payload: SliceSTLRequest):
         raise HTTPException(status_code=404, detail="STL file not found")
     
     try:
-        repro = _build_slice_repro_context(payload.profile, payload.slice_settings)
+        merged_slice_settings = _build_slice_overrides(payload)
+        repro = _build_slice_repro_context(payload.profile, merged_slice_settings)
         gcode_path = slice_stl_to_gcode(
             stl_path, 
-            payload.slice_settings,
+            merged_slice_settings,
             payload.profile
         )
 
@@ -322,7 +345,8 @@ def route_slice_existing_stl(payload: SliceSTLRequest):
                 "template_source": "stl_file",
                 "params": {"stl_filename": payload.stl_filename},
                 "profile": repro["profile"],
-                "slice_settings": repro["slice_settings"],
+                "slice_settings": payload.slice_settings,
+                "material_preset": payload.material_preset,
                 "effective_slice_settings": repro["effective_slice_settings"],
                 "printer_definition": repro["printer_definition"],
                 "multi_part": False,
@@ -393,6 +417,18 @@ def get_printers():
         return {"printers": printers}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list printers: {str(e)}")
+
+
+@router.get("/materials")
+def get_materials():
+    """
+    List the material presets available to the slicer UI.
+    """
+    try:
+        materials = list_material_presets()
+        return {"materials": materials}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list materials: {str(e)}")
 
 
 @router.get("/slice-settings")

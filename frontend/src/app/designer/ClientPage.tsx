@@ -32,6 +32,12 @@ type SliceProfile = {
   metadata?: Record<string, any>;
   file?: string;
 };
+type MaterialPreset = {
+  id: string;
+  name: string;
+  description?: string;
+  settings?: Record<string, any>;
+};
 
 type RunOutput = {
   type: string;
@@ -47,6 +53,7 @@ type RunRecord = {
   template_id?: string | null;
   params?: Record<string, any>;
   profile?: string | null;
+  material_preset?: string | null;
   slice_settings?: Record<string, any> | null;
   printer_definition?: string | null;
   outputs?: RunOutput[];
@@ -86,6 +93,9 @@ export default function ClientPage() {
   const [sliceProfiles, setSliceProfiles] = useState<SliceProfile[]>([]);
   const [sliceProfilesLoading, setSliceProfilesLoading] = useState(false);
   const [selectedSliceProfileId, setSelectedSliceProfileId] = useState<string>("balanced_profile");
+  const [materialPresets, setMaterialPresets] = useState<MaterialPreset[]>([]);
+  const [materialPresetsLoading, setMaterialPresetsLoading] = useState(false);
+  const [selectedMaterialPresetId, setSelectedMaterialPresetId] = useState<string>("preset");
   const [adhesionMode, setAdhesionMode] = useState<string>("preset");
   const [runHistory, setRunHistory] = useState<RunRecord[]>([]);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
@@ -268,10 +278,49 @@ export default function ClientPage() {
     };
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      setMaterialPresetsLoading(true);
+      try {
+        const res = await fetch(`${apiBaseUrl}/materials`);
+        if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+
+        const payload = await res.json();
+        if (!alive) return;
+
+        const materials: MaterialPreset[] = payload.materials ?? [];
+        setMaterialPresets(materials);
+
+        const availableIds = new Set(materials.map((material) => material.id));
+        const fallback = availableIds.has("preset") ? "preset" : materials[0]?.id ?? "preset";
+        setSelectedMaterialPresetId((prev) => (availableIds.has(prev) ? prev : fallback));
+      } catch {
+        if (!alive) return;
+        setMaterialPresets([]);
+        setSelectedMaterialPresetId("preset");
+      } finally {
+        if (alive) {
+          setMaterialPresetsLoading(false);
+        }
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [apiBaseUrl]);
+
   const selected = useMemo(() => templates.find((t) => t.id === selectedId) ?? null, [templates, selectedId]);
   const selectedSliceProfile = useMemo(
     () => sliceProfiles.find((p) => p.id === selectedSliceProfileId) ?? null,
     [sliceProfiles, selectedSliceProfileId]
+  );
+  const selectedMaterialPreset = useMemo(
+    () => materialPresets.find((material) => material.id === selectedMaterialPresetId) ?? null,
+    [materialPresets, selectedMaterialPresetId]
   );
   const isThreadedNutBoltTemplate = useMemo(
     () => !!selected && !isUserTemplate(selected) && selected.id === "threaded_nut_bolt",
@@ -595,6 +644,12 @@ export default function ClientPage() {
       setSelectedSliceProfileId(run.profile);
     }
 
+    if (typeof run.material_preset === "string" && run.material_preset.trim() !== "") {
+      setSelectedMaterialPresetId(run.material_preset);
+    } else {
+      setSelectedMaterialPresetId("preset");
+    }
+
     const adhesion = run.slice_settings?.adhesion_type;
     if (typeof adhesion === "string" && adhesion.trim() !== "") {
       setAdhesionMode(adhesion);
@@ -837,6 +892,7 @@ export default function ClientPage() {
       let slicePayload: Record<string, any> = {
         params: normalized,
         slice_settings: adhesionMode === "preset" ? null : { adhesion_type: adhesionMode },
+        material_preset: selectedMaterialPresetId,
         profile: selectedSliceProfileId,
         user_id: user?.uid,
       };
@@ -856,7 +912,9 @@ export default function ClientPage() {
       }
 
       setStatusMsg(
-        `Slicing to G-code using ${selectedSliceProfile?.name ?? selectedSliceProfileId} preset…`
+        `Slicing to G-code using ${selectedSliceProfile?.name ?? selectedSliceProfileId} preset${
+          selectedMaterialPreset?.id === "preset" ? "" : ` and ${selectedMaterialPreset?.name ?? selectedMaterialPresetId}`
+        }…`
       );
       const res = await fetch(`${apiBaseUrl}/slice`, {
         method: "POST",
@@ -1028,7 +1086,7 @@ export default function ClientPage() {
                       <label htmlFor="slice-profile">Guided slicer preset</label>
                       <select
                         id="slice-profile"
-                        className={styles.input}
+                        className={styles.sliceSelect}
                         value={selectedSliceProfileId}
                         onChange={(e) => setSelectedSliceProfileId(e.target.value)}
                         disabled={sliceProfilesLoading || sliceProfiles.length === 0}
@@ -1052,10 +1110,42 @@ export default function ClientPage() {
                     </div>
 
                     <div className={styles.slicePresetBox}>
+                      <label htmlFor="material-preset">Material</label>
+                      <select
+                        id="material-preset"
+                        className={styles.sliceSelect}
+                        value={selectedMaterialPresetId}
+                        onChange={(e) => setSelectedMaterialPresetId(e.target.value)}
+                        disabled={materialPresetsLoading || materialPresets.length === 0}
+                      >
+                        {materialPresets.length > 0 ? (
+                          materialPresets.map((material) => (
+                            <option key={material.id} value={material.id}>
+                              {material.name}
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="preset">Use profile default</option>
+                            <option value="pla">PLA</option>
+                            <option value="petg">PETG</option>
+                            <option value="abs">ABS</option>
+                          </>
+                        )}
+                      </select>
+                      <p className={styles.slicePresetHelp}>
+                        {materialPresetsLoading
+                          ? "Loading material presets…"
+                          : selectedMaterialPreset?.description ||
+                            "Material temperatures are merged into the selected slicer preset for this slice only."}
+                      </p>
+                    </div>
+
+                    <div className={styles.slicePresetBox}>
                       <label htmlFor="adhesion-mode">Optional adhesion</label>
                       <select
                         id="adhesion-mode"
-                        className={styles.input}
+                        className={styles.sliceSelect}
                         value={adhesionMode}
                         onChange={(e) => setAdhesionMode(e.target.value)}
                       >

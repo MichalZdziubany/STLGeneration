@@ -25,6 +25,77 @@ EXTRUDERS_DIR = get_cura_resources_root() / "extruders"
 QUALITY_DIR = get_cura_resources_root() / "quality"
 
 
+MATERIAL_PRESETS: List[Dict[str, Any]] = [
+    {
+        "id": "preset",
+        "name": "Use profile default",
+        "description": "Keep the material temperatures from the selected quality preset.",
+        "settings": {},
+        "guided_order": 0,
+    },
+    {
+        "id": "pla",
+        "name": "PLA",
+        "description": "General-purpose PLA with a standard first-layer boost.",
+        "settings": {
+            "material_print_temperature": 205,
+            "material_print_temperature_layer_0": 210,
+            "material_bed_temperature": 60,
+            "material_bed_temperature_layer_0": 60,
+        },
+        "guided_order": 10,
+    },
+    {
+        "id": "pla_plus",
+        "name": "PLA+",
+        "description": "Slightly hotter PLA+ profile for stronger layer bonding.",
+        "settings": {
+            "material_print_temperature": 210,
+            "material_print_temperature_layer_0": 215,
+            "material_bed_temperature": 60,
+            "material_bed_temperature_layer_0": 60,
+        },
+        "guided_order": 11,
+    },
+    {
+        "id": "petg",
+        "name": "PETG",
+        "description": "PETG temperatures with a warm first layer and bed.",
+        "settings": {
+            "material_print_temperature": 240,
+            "material_print_temperature_layer_0": 245,
+            "material_bed_temperature": 75,
+            "material_bed_temperature_layer_0": 80,
+        },
+        "guided_order": 20,
+    },
+    {
+        "id": "abs",
+        "name": "ABS",
+        "description": "ABS temperatures for hotter, enclosure-friendly printing.",
+        "settings": {
+            "material_print_temperature": 245,
+            "material_print_temperature_layer_0": 250,
+            "material_bed_temperature": 100,
+            "material_bed_temperature_layer_0": 105,
+        },
+        "guided_order": 30,
+    },
+    {
+        "id": "tpu",
+        "name": "TPU",
+        "description": "Flexible filament settings with a slower, cooler profile.",
+        "settings": {
+            "material_print_temperature": 225,
+            "material_print_temperature_layer_0": 230,
+            "material_bed_temperature": 50,
+            "material_bed_temperature_layer_0": 50,
+        },
+        "guided_order": 40,
+    },
+]
+
+
 def _resolve_curaengine_binary() -> str:
     """Resolve the CuraEngine executable path reliably inside container/runtime."""
     explicit = os.getenv("CURA_ENGINE_BIN")
@@ -318,6 +389,28 @@ def merge_settings(base_settings: Dict[str, Any], overrides: Dict[str, Any]) -> 
 def normalize_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     # Use shared normalizer
     return normalize_values(settings, bool_to_lower=True, skip_none=True, skip_empty_str=True)
+
+
+def list_material_presets() -> List[Dict[str, Any]]:
+    """List the curated material presets used by the slicing UI."""
+    return [
+        {
+            "id": preset["id"],
+            "name": preset["name"],
+            "description": preset["description"],
+            "settings": preset["settings"],
+        }
+        for preset in sorted(MATERIAL_PRESETS, key=lambda item: (item.get("guided_order", 999), item["name"].lower()))
+    ]
+
+
+def get_material_preset_settings(material_id: str) -> Dict[str, Any]:
+    """Resolve a material preset into Cura slice overrides."""
+    normalized = material_id.strip().lower()
+    for preset in MATERIAL_PRESETS:
+        if preset["id"] == normalized:
+            return dict(preset.get("settings", {}))
+    return {}
 
 
 def _sanitize_gcode_comment_value(value: Any) -> str:

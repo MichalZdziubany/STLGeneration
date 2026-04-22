@@ -72,6 +72,14 @@
   width: 120px;
 }
 
+.sliceSelect {
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .slider {
   flex: 1;
 }
