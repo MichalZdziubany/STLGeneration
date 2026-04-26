@@ -56,6 +56,15 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["WIDTH", "LENGTH", "DEPTH"],
         "tags": ["Beginner", "Utility"],
     },
+    "nozzle_adapter_template.scad.j2": {
+        "id": "nozzle_adapter",
+        "name": "Nozzle Adapter",
+        "geometry": "Tapered Hollow Cylinder",
+        "dimensions": "Length + dual diameters",
+        "description": "Hollow adapter with start diameter, tapered middle third, and end diameter.",
+        "parameters": ["DIAMETER_START", "DIAMETER_END", "LENGTH"],
+        "tags": ["Mechanical", "Adapter"],
+    },
 }
 
 

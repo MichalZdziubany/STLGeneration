@@ -1,0 +1,63 @@
+//
+// NOZZLE ADAPTER TEMPLATE
+// Parameters injected by backend.
+//
+
+diameter_start = {{DIAMETER_START}};
+diameter_end = {{DIAMETER_END}};
+adapter_length = {{LENGTH}};
+
+eps = 0.02;
+
+// Keep wall thickness printable while requiring only 3 input parameters.
+wall_thickness = min(max(min(diameter_start, diameter_end) * 0.12, 2), 5);
+
+third_len = adapter_length / 3;
+remaining_len = max(adapter_length - 2 * third_len, 0.1);
+
+// Treat provided diameters as the internal flow path.
+inner_diameter_start = max(diameter_start, 0.8);
+inner_diameter_end = max(diameter_end, 0.8);
+
+outer_diameter_start = inner_diameter_start + 2 * wall_thickness;
+outer_diameter_end = inner_diameter_end + 2 * wall_thickness;
+
+module outer_profile() {
+    union() {
+        // First third: straight start diameter.
+        cylinder(h = third_len, d = outer_diameter_start, center = false, $fn = 96);
+
+        // Middle third: smooth transition from start to end diameter.
+        translate([0, 0, third_len])
+            cylinder(h = third_len, d1 = outer_diameter_start, d2 = outer_diameter_end, center = false, $fn = 96);
+
+        // Last third: straight end diameter.
+        translate([0, 0, 2 * third_len])
+            cylinder(h = remaining_len, d = outer_diameter_end, center = false, $fn = 96);
+    }
+}
+
+module inner_profile() {
+    union() {
+        cylinder(h = third_len + 2 * eps, d = inner_diameter_start, center = false, $fn = 96);
+
+        translate([0, 0, third_len])
+            cylinder(
+                h = third_len + 2 * eps,
+                d1 = inner_diameter_start,
+                d2 = inner_diameter_end,
+                center = false,
+                $fn = 96
+            );
+
+        translate([0, 0, 2 * third_len])
+            cylinder(h = remaining_len + 2 * eps, d = inner_diameter_end, center = false, $fn = 96);
+    }
+}
+
+// Hollow adapter body.
+difference() {
+    outer_profile();
+    translate([0, 0, -eps])
+        inner_profile();
+}
