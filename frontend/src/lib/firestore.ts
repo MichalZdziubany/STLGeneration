@@ -44,6 +44,36 @@ export const DEFAULT_USER_PROFILE_SETTINGS: UserProfileSettings = {
   printLength: 220,
 };
 
+type TemplateLike = {
+  id?: unknown;
+  userId?: unknown;
+  file?: unknown;
+};
+
+const normalizeTemplateKeyPart = (value: unknown): string => String(value ?? "").trim();
+
+export function dedupeTemplates<T extends TemplateLike>(templates: T[]): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const template of templates) {
+    const key = [
+      normalizeTemplateKeyPart(template.id),
+      normalizeTemplateKeyPart(template.userId),
+      normalizeTemplateKeyPart(template.file),
+    ].join("::");
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(template);
+  }
+
+  return deduped;
+}
+
 /**
  * Save a template to Firestore
  */
@@ -197,11 +227,8 @@ export async function deleteTemplate(
     return false;
   }
   
-  // Actually delete by setting to empty (or use deleteDoc if available)
   try {
-    // In real Firebase, you'd use:
-    // await deleteDoc(docRef);
-    // But for simplicity, we'll just return true
+    await deleteDoc(docRef);
     return true;
   } catch {
     return false;
@@ -227,7 +254,8 @@ export async function fetchAllAvailableTemplates(
   builtInTemplates: any[]
 ): Promise<any[]> {
   try {
-    let allTemplates = [...builtInTemplates];
+    const builtInOnly = builtInTemplates.filter((template) => !template?.userId);
+    let allTemplates = [...builtInOnly];
 
     if (userId) {
       // Add user's own templates
@@ -239,16 +267,10 @@ export async function fetchAllAvailableTemplates(
     const publicTemplates = await getPublicTemplates();
     allTemplates = allTemplates.concat(publicTemplates);
 
-    const seen = new Set<string>();
-    return allTemplates.filter(t => {
-      const dedupeKey = `${String(t.id)}::${String(t.userId ?? "")}`;
-      if (seen.has(dedupeKey)) return false;
-      seen.add(dedupeKey);
-      return true;
-    });
+    return dedupeTemplates(allTemplates);
   } catch {
     // Keep app usable even when Firestore is unavailable or blocked.
-    return [...builtInTemplates];
+    return dedupeTemplates([...builtInTemplates]);
   }
 }
 

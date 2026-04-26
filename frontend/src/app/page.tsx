@@ -5,7 +5,7 @@ import styles from "./LandingPage.module.css";
 import Link from "next/link";
 import AuthNavLink from "@/components/AuthNavLink";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchAllAvailableTemplates } from "@/lib/firestore";
+import { dedupeTemplates, fetchAllAvailableTemplates } from "@/lib/firestore";
 
 type TemplateCard = {
   id: string;
@@ -63,16 +63,17 @@ export default function Home() {
 
         const payload = await response.json();
         if (isMounted) {
-          const backendTemplates: TemplateCard[] = payload.templates ?? [];
+          const backendTemplates: TemplateCard[] = dedupeTemplates(payload.templates ?? []);
+          const backendBuiltInTemplates: TemplateCard[] = backendTemplates.filter((template) => !template.userId);
 
           // Prioritize local backend templates for initial render.
-          setTemplates(backendTemplates);
+          setTemplates(backendBuiltInTemplates);
           setTemplateStatus("ready");
 
           // Then merge in user-uploaded Firestore templates.
           const mergedTemplates = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
           if (!isMounted) return;
-          setTemplates(mergedTemplates);
+          setTemplates(dedupeTemplates(mergedTemplates));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load templates";

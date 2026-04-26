@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "../LandingPage.module.css";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchAllAvailableTemplates } from "@/lib/firestore";
+import { dedupeTemplates, fetchAllAvailableTemplates } from "@/lib/firestore";
 
 type TemplateCard = {
   id: string;
@@ -45,16 +45,17 @@ export default function TemplatesPage() {
         if (!res.ok) throw new Error(`Backend returned ${res.status}`);
         const payload = await res.json();
         if (!alive) return;
-        const backendTemplates: TemplateCard[] = payload.templates ?? [];
+        const backendTemplates: TemplateCard[] = dedupeTemplates(payload.templates ?? []);
+        const backendBuiltInTemplates: TemplateCard[] = backendTemplates.filter((template) => !template.userId);
 
         // Prioritize local backend templates for initial render.
-        setTemplates(backendTemplates);
+        setTemplates(backendBuiltInTemplates);
         setStatus("ready");
 
         // Then merge in user-uploaded Firestore templates.
         const list: TemplateCard[] = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
         if (!alive) return;
-        setTemplates(list);
+        setTemplates(dedupeTemplates(list));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unable to load templates";
         if (!alive) return;

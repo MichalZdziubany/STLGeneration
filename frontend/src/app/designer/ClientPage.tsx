@@ -7,7 +7,7 @@ import StlPreview from "@/components/StlPreview";
 import AuthNavLink from "@/components/AuthNavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadEffectiveUserProfileSettings } from "@/lib/profile-settings";
-import { fetchAllAvailableTemplates, getTemplate as getFirestoreTemplate } from "@/lib/firestore";
+import { dedupeTemplates, fetchAllAvailableTemplates, getTemplate as getFirestoreTemplate } from "@/lib/firestore";
 import landingStyles from "../LandingPage.module.css";
 import styles from "../DesignerPage.module.css";
 
@@ -216,17 +216,18 @@ export default function ClientPage() {
         if (!res.ok) throw new Error(`Backend returned ${res.status}`);
         const payload = await res.json();
         if (!alive) return;
-        const backendTemplates: TemplateCard[] = payload.templates ?? [];
+        const backendTemplates: TemplateCard[] = dedupeTemplates(payload.templates ?? []);
+        const backendBuiltInTemplates: TemplateCard[] = backendTemplates.filter((template) => !template.userId);
 
         // Prioritize local backend templates for initial render.
-        setTemplates(backendTemplates);
+        setTemplates(backendBuiltInTemplates);
         setStatus("ready");
-        setSelectedId((prev) => prev ?? (backendTemplates[0]?.id ?? null));
+        setSelectedId((prev) => prev ?? (backendBuiltInTemplates[0]?.id ?? null));
 
         // Then merge in user-uploaded Firestore templates.
         const list: TemplateCard[] = await fetchAllAvailableTemplates(user?.uid ?? null, backendTemplates);
         if (!alive) return;
-        setTemplates(list);
+        setTemplates(dedupeTemplates(list));
         setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unable to load templates";
