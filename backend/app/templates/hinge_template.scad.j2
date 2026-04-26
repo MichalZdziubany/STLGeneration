@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-pin_diameter = max({{PIN_DIAMETER}}, 1.0);
-leaf_length = max({{LEAF_LENGTH}}, 20.0);
-knuckle_count_input = {{KNUCKLE_COUNT}};
+pin_diameter = max({{ PIN_DIAMETER | default(4) }}, 1.0);
+leaf_length = max({{ LEAF_LENGTH | default(60) }}, 20.0);
+knuckle_count_input = {{ KNUCKLE_COUNT | default(5) }};
 part_mode = "{{ PART_MODE | default('both') }}";
 
 knuckle_count = max(floor(knuckle_count_input), 3);

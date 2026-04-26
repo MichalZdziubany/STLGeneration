@@ -3,10 +3,10 @@
 // Parameters injected by backend.
 //
 
-teeth_count = max({{TEETH_COUNT}}, 6);
-module_size = max({{MODULE}}, 0.4);
-pressure_angle_deg = min(max({{PRESSURE_ANGLE}}, 14), 35);
-gear_thickness = max({{THICKNESS}}, 1);
+teeth_count = max({{ TEETH_COUNT | default(24) }}, 6);
+module_size = max({{ MODULE | default(1.5) }}, 0.4);
+pressure_angle_deg = min(max({{ PRESSURE_ANGLE | default(20) }}, 14), 35);
+gear_thickness = max({{ THICKNESS | default(8) }}, 1);
 
 segments_per_tooth = 8;
 

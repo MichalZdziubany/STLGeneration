@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-height    = {{HEIGHT}};
-diameter  = {{DIAMETER}};
-segments  = {{SEGMENTS}};   // number of cylinder facets
+height    = {{ HEIGHT | default(60) }};
+diameter  = {{ DIAMETER | default(30) }};
+segments  = {{ SEGMENTS | default(64) }};   // number of cylinder facets
 
 cylinder(
     h = height,

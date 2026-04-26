@@ -3,10 +3,10 @@
 // Parameters injected by backend.
 //
 
-diameter = max({{DIAMETER}}, 12);
-pitch = max({{PITCH}}, 1.0);
-wall_thickness = max({{WALL_THICKNESS}}, 1.2);
-container_height = max({{HEIGHT}}, 20);
+diameter = max({{ DIAMETER | default(30) }}, 12);
+pitch = max({{ PITCH | default(2.0) }}, 1.0);
+wall_thickness = max({{ WALL_THICKNESS | default(2.0) }}, 1.2);
+container_height = max({{ HEIGHT | default(40) }}, 20);
 part_mode = "{{ PART_MODE | default('both') }}";
 
 eps = 0.02;

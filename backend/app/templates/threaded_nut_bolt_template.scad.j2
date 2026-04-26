@@ -7,13 +7,13 @@
 // Parameters are injected by backend.
 //
 
-bolt_len        = {{BOLT_LENGTH}};
-major_d         = {{THREAD_MAJOR_DIAMETER}};
-pitch           = {{THREAD_PITCH}};
-thread_depth_in = {{THREAD_DEPTH}};
-head_h          = {{HEAD_HEIGHT}};
-head_flat       = {{HEAD_FLAT_DIAMETER}};
-segments        = {{SEGMENTS}};
+bolt_len        = {{ BOLT_LENGTH | default(30) }};
+major_d         = {{ THREAD_MAJOR_DIAMETER | default(6) }};
+pitch           = {{ THREAD_PITCH | default(1.0) }};
+thread_depth_in = {{ THREAD_DEPTH | default(0.8) }};
+head_h          = {{ HEAD_HEIGHT | default(6) }};
+head_flat       = {{ HEAD_FLAT_DIAMETER | default(10) }};
+segments        = {{ SEGMENTS | default(72) }};
 part_mode       = "{{ PART_MODE | default('both') }}";
 
 eps = 0.01;

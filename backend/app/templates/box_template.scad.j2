@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-box_width = {{WIDTH}};
-box_length = {{LENGTH}};
-box_depth = {{DEPTH}};
+box_width = {{ WIDTH | default(60) }};
+box_length = {{ LENGTH | default(80) }};
+box_depth = {{ DEPTH | default(40) }};
 
 wall_thickness = min(max(min(box_width, box_length) * 0.08, 2), 5);
 

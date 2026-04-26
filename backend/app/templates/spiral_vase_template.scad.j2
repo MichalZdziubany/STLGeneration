@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-twist_deg = {{TWIST}};
-vase_height = max({{HEIGHT}}, 20);
-radius_curve = {{RADIUS_CURVE}};
+twist_deg = {{ TWIST | default(540) }};
+vase_height = max({{ HEIGHT | default(80) }}, 20);
+radius_curve = {{ RADIUS_CURVE | default(8) }};
 
 segments = 144;
 wave_count = 6;

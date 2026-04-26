@@ -4,7 +4,7 @@
 // {{CUBE_SIZE}} = length of each edge
 //
 
-cube_size = {{CUBE_SIZE}};
+cube_size = {{ CUBE_SIZE | default(50) }};
 
 // Center in X/Y for slicer placement, but keep bottom face on Z=0
 translate([0, 0, cube_size / 2])

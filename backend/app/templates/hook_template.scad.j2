@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-hook_height = {{HOOK_HEIGHT}};
-hook_reach = {{HOOK_REACH}};
-thickness = {{THICKNESS}};
+hook_height = {{ HOOK_HEIGHT | default(50) }};
+hook_reach = {{ HOOK_REACH | default(40) }};
+thickness = {{ THICKNESS | default(4) }};
 
 segments = 64;
 eps = 0.02;

@@ -4,8 +4,8 @@
 // Parameters injected by backend.
 //
 
-base_size = {{BASE_SIZE}};   // width & depth
-height    = {{HEIGHT}};      // height
+base_size = {{ BASE_SIZE | default(50) }};   // width & depth
+height    = {{ HEIGHT | default(60) }};      // height
 
 polyhedron(
     points=[

@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-phone_width = max({{PHONE_WIDTH}}, 50);
-phone_thickness = max({{PHONE_THICKNESS}}, 6);
-stand_height = max({{STAND_HEIGHT}}, 70);
+phone_width = max({{ PHONE_WIDTH | default(85) }}, 50);
+phone_thickness = max({{ PHONE_THICKNESS | default(8) }}, 6);
+stand_height = max({{ STAND_HEIGHT | default(100) }}, 70);
 
 clearance = 1.0;
 wall = 3.0;

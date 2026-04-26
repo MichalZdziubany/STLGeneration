@@ -3,9 +3,9 @@
 // Parameters injected by backend.
 //
 
-diameter_start = {{DIAMETER_START}};
-diameter_end = {{DIAMETER_END}};
-adapter_length = {{LENGTH}};
+diameter_start = {{ DIAMETER_START | default(10) }};
+diameter_end = {{ DIAMETER_END | default(14) }};
+adapter_length = {{ LENGTH | default(50) }};
 
 eps = 0.02;
 
