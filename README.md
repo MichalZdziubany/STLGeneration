@@ -43,6 +43,7 @@ High-level flow:
 - `GET /profiles` — list available slicing profiles.
 - `GET /profiles/{name}` — get full settings for a profile.
 - `GET /printers` — list Cura printer definitions and build volumes discovered from Cura resources.
+- `GET /materials` — list slicer material presets available in the UI.
 
 ## Quick Start (Docker)
 Prerequisites: Docker + Docker Compose.
@@ -58,6 +59,12 @@ The services share the [backend/jobs](backend/jobs) folder for generated files.
 User-uploaded template files are persisted in a Docker named volume (`backend_user_templates`) mounted to `/app/app/user_templates`, so they remain available across container rebuilds/recreates.
 
 ## Local Development (without Docker)
+Prerequisites for local non-Docker build:
+- Python 3.10+ and pip
+- Node.js 18+ and npm
+- OpenSCAD CLI installed and available on PATH
+- CuraEngine CLI installed and available on PATH
+
 Backend (FastAPI):
 
 ```bash
@@ -91,7 +98,7 @@ Optional:
 
 If any required Firebase vars are missing, the frontend throws an explicit startup error listing which keys are missing.
 
-Note: If not using Docker, you’ll need OpenSCAD and CuraEngine installed locally (or adapt paths). The Docker route is simpler because it packages those CLIs for you.
+Important: Non-Docker local builds require both OpenSCAD and CuraEngine. If either CLI is missing, STL generation and/or slicing endpoints will fail at runtime.
 
 Printer discovery for profile settings (`GET /printers`) now checks:
 - Bundled Cura resources from `CURA_RESOURCES` (defaults to `/opt/cura-resources`).
@@ -224,10 +231,6 @@ Notes:
 
 ## Future Work
 - More parametric templates (threads, brackets, hinges, LEGO-style bricks).
-- Profile editor in the UI; preview changes before slicing.
-- Inline 3D viewer for STL (WebGL/Three.js).
-- Better account-level features (template sharing controls, richer run management, and profile sync UX).
-- Upload custom templates and share profiles.
 
 ## Acknowledgements
 - OpenSCAD for parametric geometry.
