@@ -1,0 +1,30 @@
+// Ring Template
+// A parametric ring design supporting common ring sizes
+// US ring sizes correspond to standard inner diameters
+
+// Parameters
+inner_diameter = {{ inner_diameter | default(18.0) }};  // Inner diameter in mm (default ~size 6)
+band_width = {{ band_width | default(4.0) }};           // Width of the ring band (mm)
+ring_height = {{ ring_height | default(6.0) }};         // Height/thickness of the ring (mm)
+smoothness = {{ smoothness | default(100) }};            // $fn for circle resolution
+
+// US Ring Size to Inner Diameter mapping (in mm):
+// Size 4: 16.5, Size 5: 17.3, Size 6: 18.0, Size 7: 18.9, Size 8: 19.7
+// Size 9: 20.6, Size 10: 21.3, Size 11: 22.2, Size 12: 23.0, Size 13: 23.9, Size 14: 24.6
+
+inner_radius = inner_diameter / 2;
+outer_radius = inner_radius + band_width;
+
+// Create the ring using a torus-like approach: cylinder difference
+module ring() {
+    difference() {
+        // Outer cylinder
+        cylinder(h=ring_height, r=outer_radius, $fn=smoothness);
+        
+        // Inner hole (subtract)
+        translate([0, 0, -0.1])
+            cylinder(h=ring_height + 0.2, r=inner_radius, $fn=smoothness);
+    }
+}
+
+ring();

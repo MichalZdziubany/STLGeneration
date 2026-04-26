@@ -1,0 +1,67 @@
+//
+// SPIRAL VASE TEMPLATE
+// Parameters injected by backend.
+//
+
+twist_deg = {{TWIST}};
+vase_height = max({{HEIGHT}}, 20);
+radius_curve = {{RADIUS_CURVE}};
+
+segments = 144;
+wave_count = 6;
+base_radius = 24;
+wall_thickness = 2.2;
+base_thickness = 1.6;
+eps = 0.02;
+
+curve_amp = min(max(radius_curve, 0), base_radius * 0.45);
+inner_curve_amp = curve_amp * 0.65;
+
+outer_points = [
+    for (i = [0:segments - 1])
+        let(
+            a = i * 360 / segments,
+            r = base_radius + curve_amp * sin(wave_count * a)
+        )
+            [r * cos(a), r * sin(a)]
+];
+
+inner_points = [
+    for (i = [0:segments - 1])
+        let(
+            a = i * 360 / segments,
+            r = max(base_radius - wall_thickness + inner_curve_amp * sin(wave_count * a), 4)
+        )
+            [r * cos(a), r * sin(a)]
+];
+
+module vase_shell() {
+    difference() {
+        linear_extrude(
+            height = vase_height,
+            twist = twist_deg,
+            slices = max(100, abs(twist_deg) * 2),
+            convexity = 10
+        )
+            polygon(points = outer_points);
+
+        translate([0, 0, -eps])
+            linear_extrude(
+                height = vase_height + 2 * eps,
+                twist = twist_deg,
+                slices = max(100, abs(twist_deg) * 2),
+                convexity = 10
+            )
+                polygon(points = inner_points);
+    }
+}
+
+module vase_base_cap() {
+    linear_extrude(height = base_thickness, center = false, convexity = 6)
+        polygon(points = outer_points);
+}
+
+union() {
+    vase_shell();
+    vase_base_cap();
+}

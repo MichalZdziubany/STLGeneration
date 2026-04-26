@@ -1,0 +1,127 @@
+//
+// THREADED CONTAINER TEMPLATE
+// Parameters injected by backend.
+//
+
+diameter = max({{DIAMETER}}, 12);
+pitch = max({{PITCH}}, 1.0);
+wall_thickness = max({{WALL_THICKNESS}}, 1.2);
+container_height = max({{HEIGHT}}, 20);
+part_mode = "{{ PART_MODE | default('both') }}";
+
+eps = 0.02;
+thread_depth = min(max(pitch * 0.7, 1.1), 2.8);
+outer_d = diameter;
+inner_d = max(outer_d - 2 * wall_thickness, 3);
+thread_height = max(pitch * 6, wall_thickness * 3, 8);
+clearance = min(max(diameter * 0.012, 0.2), 0.5);
+
+neck_z = container_height - thread_height;
+cap_outer_d = outer_d + wall_thickness * 2;
+cap_height = thread_height + wall_thickness * 3;
+part_spacing = max(outer_d + cap_outer_d, 40);
+
+module external_thread(major, core, len, pitch_val, depth, facets) {
+    union() {
+        cylinder(h = len, d = core, center = false, $fn = facets);
+
+        linear_extrude(
+            height = len,
+            twist = 360 * (len / pitch_val),
+            slices = max(12, ceil((len / pitch_val) * 24)),
+            convexity = 10
+        )
+            translate([core / 2, 0, 0])
+                polygon(points = [
+                    [0, -pitch_val * 0.52],
+                    [depth, 0],
+                    [0, pitch_val * 0.52]
+                ]);
+    }
+}
+
+module internal_thread_cut(nominal_major, len, pitch_val, depth, fit, facets) {
+    nominal = nominal_major + fit;
+    core_d = max(nominal - 2 * depth, 1.0);
+
+    union() {
+        translate([0, 0, -eps])
+            cylinder(h = len + 2 * eps, d = core_d, center = false, $fn = facets);
+
+        linear_extrude(
+            height = len + 2 * eps,
+            twist = 360 * ((len + 2 * eps) / pitch_val),
+            slices = max(12, ceil(((len + 2 * eps) / pitch_val) * 24)),
+            convexity = 12
+        )
+            translate([core_d / 2, 0, -eps])
+                polygon(points = [
+                    [0, -pitch_val * 0.54],
+                    [depth + fit * 0.9, 0],
+                    [0, pitch_val * 0.54]
+                ]);
+    }
+}
+
+module container_body() {
+    difference() {
+        union() {
+            cylinder(h = container_height, d = outer_d, center = false, $fn = 96);
+
+            translate([0, 0, neck_z])
+                external_thread(
+                    major = outer_d + 2 * thread_depth,
+                    core = outer_d,
+                    len = thread_height,
+                    pitch_val = pitch,
+                    depth = thread_depth,
+                    facets = 96
+                );
+        }
+
+        translate([0, 0, wall_thickness])
+            cylinder(
+                h = container_height - wall_thickness + eps,
+                d = inner_d,
+                center = false,
+                $fn = 96
+            );
+    }
+}
+
+module cap_body() {
+    difference() {
+        cylinder(h = cap_height, d = cap_outer_d, center = false, $fn = 96);
+
+        translate([0, 0, wall_thickness])
+            cylinder(
+                h = cap_height - wall_thickness + eps,
+                d = outer_d + 2 * clearance,
+                center = false,
+                $fn = 96
+            );
+
+        translate([0, 0, wall_thickness])
+            internal_thread_cut(
+                nominal_major = outer_d + 2 * thread_depth,
+                len = thread_height,
+                pitch_val = pitch,
+                depth = thread_depth,
+                fit = clearance,
+                facets = 96
+            );
+    }
+}
+
+// PART_MODE options:
+// - "both": container + cap
+// - "container": container body only
+// - "cap": cap only
+if (part_mode == "both" || part_mode == "container") {
+    container_body();
+}
+
+if (part_mode == "both" || part_mode == "cap") {
+    translate([part_spacing, 0, 0])
+        cap_body();
+}

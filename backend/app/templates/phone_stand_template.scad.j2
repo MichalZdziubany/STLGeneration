@@ -1,0 +1,47 @@
+//
+// PHONE STAND TEMPLATE
+// Parameters injected by backend.
+//
+
+phone_width = max({{PHONE_WIDTH}}, 50);
+phone_thickness = max({{PHONE_THICKNESS}}, 6);
+stand_height = max({{STAND_HEIGHT}}, 70);
+
+clearance = 1.0;
+wall = 3.0;
+base_thickness = 4.0;
+back_tilt_from_vertical = 20;
+
+stand_width = phone_width + 2 * wall;
+base_depth = max(stand_height * 0.62, phone_thickness * 6, 60);
+lip_height = max(phone_thickness * 1.25, 10);
+lip_depth = phone_thickness + clearance + wall;
+back_bottom_x = wall * 1.2;
+
+back_length = stand_height / cos(back_tilt_from_vertical);
+back_top_x = back_bottom_x + back_length * sin(back_tilt_from_vertical);
+lip_x = base_depth - lip_depth;
+
+module bar_at(x, z, dx, dz) {
+    translate([x, -stand_width / 2, z])
+        cube([dx, stand_width, dz], center = false);
+}
+
+union() {
+    // Base platform.
+    bar_at(0, 0, base_depth, base_thickness);
+
+    // Slanted back support.
+    translate([back_bottom_x, -stand_width / 2, base_thickness])
+        rotate([0, back_tilt_from_vertical, 0])
+            cube([wall, stand_width, back_length], center = false);
+
+    // Front retention lip.
+    bar_at(lip_x, base_thickness, wall, lip_height);
+
+    // Reinforcing rib from base to back support.
+    hull() {
+        bar_at(lip_x - wall * 0.6, base_thickness, wall, wall);
+        bar_at(back_top_x - wall * 1.2, stand_height * 0.45, wall, wall);
+    }
+}
