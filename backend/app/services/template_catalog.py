@@ -65,6 +65,15 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["DIAMETER_START", "DIAMETER_END", "LENGTH"],
         "tags": ["Mechanical", "Adapter"],
     },
+    "hook_template.scad.j2": {
+        "id": "hook",
+        "name": "Wall Hook",
+        "geometry": "Wall-Mounted Hook",
+        "dimensions": "Height + reach + thickness",
+        "description": "Generate a wall-mounted hook with a screw-hole backplate and reinforced arm.",
+        "parameters": ["HOOK_HEIGHT", "HOOK_REACH", "THICKNESS"],
+        "tags": ["Utility", "Beginner"],
+    },
 }
 
 

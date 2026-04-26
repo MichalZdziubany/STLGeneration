@@ -1,0 +1,67 @@
+//
+// HOOK TEMPLATE
+// Parameters injected by backend.
+//
+
+hook_height = {{HOOK_HEIGHT}};
+hook_reach = {{HOOK_REACH}};
+thickness = {{THICKNESS}};
+
+segments = 64;
+eps = 0.02;
+
+plate_thickness = max(thickness, 3);
+plate_width = max(thickness * 3.5, 20);
+plate_height = max(hook_height, thickness * 6);
+
+mount_hole_diameter = min(max(thickness * 0.65, 3.5), 6);
+arm_z = plate_height * 0.55;
+arm_end_x = max(hook_reach - thickness * 0.8, thickness * 2.5);
+lip_height = max(thickness * 1.7, 8);
+
+module rod_segment(p1, p2, d) {
+    hull() {
+        translate(p1)
+            sphere(d = d, $fn = segments);
+        translate(p2)
+            sphere(d = d, $fn = segments);
+    }
+}
+
+// Wall-mounted hook: backplate with two screw holes and a reinforced arm.
+difference() {
+    union() {
+        // Backplate against the wall (wall plane at x = 0).
+        translate([-plate_thickness, -plate_width / 2, 0])
+            cube([plate_thickness, plate_width, plate_height], center = false);
+
+        // Main hook arm.
+        rod_segment([0, 0, arm_z], [arm_end_x, 0, arm_z], thickness);
+
+        // Upturned lip at the front to prevent slips.
+        rod_segment(
+            [arm_end_x, 0, arm_z],
+            [arm_end_x, 0, arm_z + lip_height],
+            thickness
+        );
+
+        // Reinforcing strut from lower plate region to arm.
+        rod_segment(
+            [0, 0, max(thickness * 1.5, plate_height * 0.18)],
+            [arm_end_x * 0.78, 0, arm_z],
+            max(thickness * 0.85, 2)
+        );
+    }
+
+    // Mounting holes through the backplate.
+    for (z_pos = [plate_height * 0.28, plate_height * 0.72]) {
+        translate([-plate_thickness - eps, 0, z_pos])
+            rotate([0, 90, 0])
+                cylinder(
+                    h = plate_thickness + 2 * eps,
+                    d = mount_hole_diameter,
+                    center = false,
+                    $fn = max(24, segments / 2)
+                );
+    }
+}
