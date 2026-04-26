@@ -1,5 +1,5 @@
 # 3D Model Platform — Parametric STL Generation & Slicing
-##Link to Screencast: https://youtu.be/nd61RHoxfcw
+## Link to Screencast: https://youtu.be/nd61RHoxfcw
 
 This is my final year project: a web app that lets you design simple parametric 3D models, generate STLs on demand, and slice them to G-code — all in the browser. It’s built to be practical: pick a template, tweak a few numbers, get a printable file. No heavy CAD, no long setup.
 
