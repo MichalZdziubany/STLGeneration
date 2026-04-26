@@ -1,0 +1,17 @@
+//
+// CABLE CLIP TEMPLATE
+//
+
+diameter = {{ DIAMETER | default(8) }};
+thickness = 3;
+
+gap = diameter * 0.6;
+
+difference() {
+    cylinder(h=thickness, d=diameter+6, $fn=64);
+    translate([0,0,-1])
+        cylinder(h=thickness+2, d=diameter, $fn=64);
+
+    translate([-gap/2,0,-1])
+        cube([gap, diameter, thickness+2]);
+}

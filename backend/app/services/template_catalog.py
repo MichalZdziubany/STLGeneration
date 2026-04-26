@@ -128,6 +128,15 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["inner_diameter", "band_width", "ring_height"],
         "tags": ["Jewelry", "Beginner", "Accessory"],
     },
+    "cable_clip_template.scad.j2": {
+        "id": "cable_clip",
+        "name": "Cable Clip",
+        "geometry": "C-shaped Clip",
+        "dimensions": "Diameter + wall thickness",
+        "description": "Generate a snap-on cable clip to organize and secure cable bundles of various diameters.",
+        "parameters": ["DIAMETER"],
+        "tags": ["Utility", "Beginner", "Organization"],
+    }
 }
 
 
