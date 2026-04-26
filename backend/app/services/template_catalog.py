@@ -47,6 +47,15 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         ],
         "tags": ["Mechanical", "Advanced", "Multi-part"],
     },
+    "box_template.scad.j2": {
+        "id": "box",
+        "name": "Parametric Box",
+        "geometry": "Rectangular Prism",
+        "dimensions": "W/L/D 20-200 mm",
+        "description": "Create rectangular boxes with independent width, length, and depth values.",
+        "parameters": ["WIDTH", "LENGTH", "DEPTH"],
+        "tags": ["Beginner", "Utility"],
+    },
 }
 
 

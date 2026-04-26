@@ -1,0 +1,24 @@
+//
+// BOX TEMPLATE
+// Parameters injected by backend.
+//
+
+box_width = {{WIDTH}};
+box_length = {{LENGTH}};
+box_depth = {{DEPTH}};
+
+wall_thickness = min(max(min(box_width, box_length) * 0.08, 2), 5);
+
+inner_width = max(box_width - 2 * wall_thickness, 0.1);
+inner_length = max(box_length - 2 * wall_thickness, 0.1);
+inner_depth = max(box_depth - wall_thickness, 0.1);
+
+// Keep bottom face on Z=0 and center in X/Y.
+difference() {
+    translate([0, 0, box_depth / 2])
+        cube([box_width, box_length, box_depth], center = true);
+
+    // Open-top cavity: leaves side walls and a bottom floor.
+    translate([0, 0, wall_thickness + inner_depth / 2])
+        cube([inner_width, inner_length, inner_depth], center = true);
+}
