@@ -96,6 +96,20 @@ export default function Home() {
     [templates, selectedTemplateId]
   );
 
+  const featuredTemplates = useMemo(() => {
+    if (templates.length <= 5) {
+      return templates;
+    }
+
+    const shuffled = [...templates];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    return shuffled.slice(0, 5);
+  }, [templates]);
+
   useEffect(() => {
     if (templateStatus !== "ready" || templates.length === 0) {
       return;
@@ -231,6 +245,10 @@ export default function Home() {
  
 
       {/* TEMPLATE GRID */}
+      <section className={styles.hero}>
+        <h2 className={styles.heroSubtitle}>Try one of these</h2>
+      </section>
+
       <section className={styles.templateGrid}>
         {templateStatus !== "ready" && (
           <div className={styles.templateState}>{templateMessage}</div>
@@ -241,7 +259,7 @@ export default function Home() {
         )}
 
         {templateStatus === "ready" &&
-          templates.map((template: TemplateCard) => (
+          featuredTemplates.map((template: TemplateCard) => (
             <article
               key={`${template.id}-${template.userId ?? "local"}-${template.file ?? "nofile"}`}
               className={styles.templateCard}
