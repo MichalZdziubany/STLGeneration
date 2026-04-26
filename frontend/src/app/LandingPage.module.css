@@ -194,6 +194,19 @@
   border-radius: 40px;
 }
 
+.templateCatalogGrid {
+  margin: 0 auto 40px;
+  padding: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 32px;
+  width: min(1400px, calc(100% - 80px));
+  box-sizing: border-box;
+  background-color: #9b9494;
+  border: solid white 10px;
+  border-radius: 40px;
+}
+
 @media (max-width: 1100px) {
   .templateGrid {
     grid-auto-flow: column;
@@ -201,6 +214,12 @@
     grid-auto-columns: minmax(240px, 1fr);
     overflow-x: auto;
     justify-content: flex-start;
+  }
+
+  .templateCatalogGrid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    width: calc(100% - 40px);
+    gap: 24px;
   }
 }
 

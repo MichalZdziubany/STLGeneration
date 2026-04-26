@@ -81,7 +81,7 @@ export default function TemplatesPage() {
         </nav>
       </header>
 
-      <section className={styles.templateGrid}>
+      <section className={styles.templateCatalogGrid}>
         {status !== "ready" && (
           <div className={styles.templateState}>{message}</div>
         )}
