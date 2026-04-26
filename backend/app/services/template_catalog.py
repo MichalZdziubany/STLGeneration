@@ -74,6 +74,24 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         "parameters": ["HOOK_HEIGHT", "HOOK_REACH", "THICKNESS"],
         "tags": ["Utility", "Beginner"],
     },
+    "gear_template.scad.j2": {
+        "id": "gear",
+        "name": "Spur Gear",
+        "geometry": "Involute Gear",
+        "dimensions": "Teeth + module + angle + thickness",
+        "description": "Generate a printable spur gear using tooth count, module, pressure angle, and thickness.",
+        "parameters": ["TEETH_COUNT", "MODULE", "PRESSURE_ANGLE", "THICKNESS"],
+        "tags": ["Mechanical", "Advanced"],
+    },
+    "hinge_template.scad.j2": {
+        "id": "hinge",
+        "name": "Customizable Hinge",
+        "geometry": "Interleaved Barrel Hinge (Multi-part)",
+        "dimensions": "Pin + length + knuckles",
+        "description": "Generate a hinge body and matching pin as separate multi-part outputs.",
+        "parameters": ["PIN_DIAMETER", "LEAF_LENGTH", "KNUCKLE_COUNT"],
+        "tags": ["Mechanical", "Utility", "Multi-part"],
+    },
 }
 
 

@@ -1,0 +1,78 @@
+//
+// GEAR TEMPLATE
+// Parameters injected by backend.
+//
+
+teeth_count = max({{TEETH_COUNT}}, 6);
+module_size = max({{MODULE}}, 0.4);
+pressure_angle_deg = min(max({{PRESSURE_ANGLE}}, 14), 35);
+gear_thickness = max({{THICKNESS}}, 1);
+
+segments_per_tooth = 8;
+
+tooth_pitch_angle = 360 / teeth_count;
+pitch_radius = module_size * teeth_count / 2;
+base_radius = pitch_radius * cos(pressure_angle_deg);
+addendum = module_size;
+dedendum = 1.25 * module_size;
+outer_radius = pitch_radius + addendum;
+root_radius = max(pitch_radius - dedendum, module_size * 0.6);
+center_bore_diameter = min(max(module_size * 3, 2), root_radius * 1.6);
+
+half_tooth_pitch_angle = tooth_pitch_angle / 4;
+
+function rad_to_deg(v) = v * 180 / PI;
+function cos_r(v) = cos(rad_to_deg(v));
+function sin_r(v) = sin(rad_to_deg(v));
+
+function involute_t_for_radius(r, rb) =
+    r <= rb ? 0 : sqrt((r * r) / (rb * rb) - 1);
+
+function involute_point(rb, t) = [
+    rb * (cos_r(t) + t * sin_r(t)),
+    rb * (sin_r(t) - t * cos_r(t))
+];
+
+function polar_angle_deg(p) = atan2(p[1], p[0]);
+
+module tooth_2d() {
+    t_pitch = involute_t_for_radius(pitch_radius, base_radius);
+    t_outer = involute_t_for_radius(outer_radius, base_radius);
+    pitch_point = involute_point(base_radius, t_pitch);
+    outer_point = involute_point(base_radius, t_outer);
+
+    pitch_involute_angle = polar_angle_deg(pitch_point);
+    outer_involute_angle = polar_angle_deg(outer_point);
+
+    // Rotate involute so flank passes through the correct pitch thickness.
+    flank_rotate = half_tooth_pitch_angle - pitch_involute_angle;
+
+    // Approximate root flank anchor for watertight tooth polygon.
+    root_flank_angle = max(half_tooth_pitch_angle + 2, outer_involute_angle + flank_rotate);
+
+    right_root = [root_radius * cos(root_flank_angle), root_radius * sin(root_flank_angle)];
+    right_tip = [outer_radius * cos(outer_involute_angle + flank_rotate), outer_radius * sin(outer_involute_angle + flank_rotate)];
+    left_tip = [right_tip[0], -right_tip[1]];
+    left_root = [right_root[0], -right_root[1]];
+
+    polygon(points = [right_root, right_tip, left_tip, left_root]);
+}
+
+module gear_2d() {
+    union() {
+        circle(r = root_radius, $fn = max(48, teeth_count * 8));
+
+        for (i = [0:teeth_count - 1]) {
+            rotate(i * tooth_pitch_angle)
+                tooth_2d();
+        }
+    }
+}
+
+difference() {
+    linear_extrude(height = gear_thickness, center = false, convexity = 10)
+        gear_2d();
+
+    translate([0, 0, -0.02])
+        cylinder(h = gear_thickness + 0.04, d = center_bore_diameter, center = false, $fn = 96);
+}

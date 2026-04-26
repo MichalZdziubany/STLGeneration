@@ -67,6 +67,11 @@ type GcodeInsight = {
   pathPoints: Array<{ x: number; y: number }>;
 };
 
+const MULTI_PART_TEMPLATE_PARTS: Record<string, string[]> = {
+  threaded_nut_bolt: ["bolt", "nut"],
+  hinge: ["hinge", "pin"],
+};
+
 export default function ClientPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id");
@@ -100,10 +105,7 @@ export default function ClientPage() {
   const [runHistory, setRunHistory] = useState<RunRecord[]>([]);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [threadedPreviewUrls, setThreadedPreviewUrls] = useState<{ bolt: string | null; nut: string | null }>({
-    bolt: null,
-    nut: null,
-  });
+  const [multiPartPreviewUrls, setMultiPartPreviewUrls] = useState<Record<string, string | null>>({});
   const [previewMsg, setPreviewMsg] = useState<string>("Adjust parameters to render a live preview.");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [autoPreview, setAutoPreview] = useState(true);
@@ -111,10 +113,7 @@ export default function ClientPage() {
   const [sliderMax, setSliderMax] = useState(200);
   const previewObjectUrlRef = useRef<string | null>(null);
   const sliceResultObjectUrlRef = useRef<string | null>(null);
-  const threadedPreviewObjectUrlsRef = useRef<{ bolt: string | null; nut: string | null }>({
-    bolt: null,
-    nut: null,
-  });
+  const multiPartPreviewObjectUrlsRef = useRef<Record<string, string | null>>({});
 
   // Helper: Check if template is a user template
   const isUserTemplate = (template: TemplateCard | null): boolean => {
@@ -323,10 +322,11 @@ export default function ClientPage() {
     () => materialPresets.find((material) => material.id === selectedMaterialPresetId) ?? null,
     [materialPresets, selectedMaterialPresetId]
   );
-  const isThreadedNutBoltTemplate = useMemo(
-    () => !!selected && !isUserTemplate(selected) && selected.id === "threaded_nut_bolt",
+  const selectedMultiPartParts = useMemo(
+    () => (!!selected && !isUserTemplate(selected) ? MULTI_PART_TEMPLATE_PARTS[selected.id] ?? null : null),
     [selected]
   );
+  const isSelectedMultiPartTemplate = selectedMultiPartParts !== null;
 
   useEffect(() => {
     if (!selected) {
@@ -700,20 +700,25 @@ export default function ClientPage() {
     return payload;
   };
 
+  const clearMultiPartPreviewUrls = (updateState: boolean = true) => {
+    Object.values(multiPartPreviewObjectUrlsRef.current).forEach((url) => {
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
+    });
+    multiPartPreviewObjectUrlsRef.current = {};
+    if (updateState) {
+      setMultiPartPreviewUrls({});
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (previewObjectUrlRef.current) {
         window.URL.revokeObjectURL(previewObjectUrlRef.current);
         previewObjectUrlRef.current = null;
       }
-      if (threadedPreviewObjectUrlsRef.current.bolt) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
-        threadedPreviewObjectUrlsRef.current.bolt = null;
-      }
-      if (threadedPreviewObjectUrlsRef.current.nut) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
-        threadedPreviewObjectUrlsRef.current.nut = null;
-      }
+      clearMultiPartPreviewUrls(false);
       if (sliceResultObjectUrlRef.current) {
         window.URL.revokeObjectURL(sliceResultObjectUrlRef.current);
         sliceResultObjectUrlRef.current = null;
@@ -747,10 +752,10 @@ export default function ClientPage() {
     try {
       const normalized = normalizeParams(params);
 
-      if (isThreadedNutBoltTemplate) {
+      if (isSelectedMultiPartTemplate && selectedMultiPartParts) {
         const payload = await buildTemplatePayload(normalized);
 
-        const loadPart = async (part: "bolt" | "nut") => {
+        const loadPart = async (part: string) => {
           const res = await fetch(`${apiBaseUrl}/generate-stl`, {
             method: "POST",
             headers,
@@ -771,24 +776,21 @@ export default function ClientPage() {
           return window.URL.createObjectURL(blob);
         };
 
-        const [boltUrl, nutUrl] = await Promise.all([loadPart("bolt"), loadPart("nut")]);
+        const previewEntries = await Promise.all(
+          selectedMultiPartParts.map(async (part) => [part, await loadPart(part)] as const)
+        );
+        const nextMultiPartPreviewUrls: Record<string, string | null> = Object.fromEntries(previewEntries);
 
         if (previewObjectUrlRef.current) {
           window.URL.revokeObjectURL(previewObjectUrlRef.current);
           previewObjectUrlRef.current = null;
         }
 
-        if (threadedPreviewObjectUrlsRef.current.bolt) {
-          window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
-        }
-        if (threadedPreviewObjectUrlsRef.current.nut) {
-          window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
-        }
-
-        threadedPreviewObjectUrlsRef.current = { bolt: boltUrl, nut: nutUrl };
-        setThreadedPreviewUrls({ bolt: boltUrl, nut: nutUrl });
+        clearMultiPartPreviewUrls();
+        multiPartPreviewObjectUrlsRef.current = nextMultiPartPreviewUrls;
+        setMultiPartPreviewUrls(nextMultiPartPreviewUrls);
         setPreviewUrl(null);
-        setPreviewMsg("Bolt and nut previews updated.");
+        setPreviewMsg(`${selectedMultiPartParts.join(" + ")} previews updated.`);
         return;
       }
 
@@ -813,14 +815,7 @@ export default function ClientPage() {
       }
       previewObjectUrlRef.current = nextUrl;
       setPreviewUrl(nextUrl);
-      if (threadedPreviewObjectUrlsRef.current.bolt) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
-      }
-      if (threadedPreviewObjectUrlsRef.current.nut) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
-      }
-      threadedPreviewObjectUrlsRef.current = { bolt: null, nut: null };
-      setThreadedPreviewUrls({ bolt: null, nut: null });
+      clearMultiPartPreviewUrls();
       setPreviewMsg("Live preview updated.");
     } catch (err) {
       if (signal.aborted) return;
@@ -829,14 +824,7 @@ export default function ClientPage() {
         previewObjectUrlRef.current = null;
       }
       setPreviewUrl(null);
-      if (threadedPreviewObjectUrlsRef.current.bolt) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.bolt);
-      }
-      if (threadedPreviewObjectUrlsRef.current.nut) {
-        window.URL.revokeObjectURL(threadedPreviewObjectUrlsRef.current.nut);
-      }
-      threadedPreviewObjectUrlsRef.current = { bolt: null, nut: null };
-      setThreadedPreviewUrls({ bolt: null, nut: null });
+      clearMultiPartPreviewUrls();
       const msg = err instanceof Error ? err.message : "Failed to render preview";
       setPreviewMsg(msg);
     } finally {
@@ -906,9 +894,9 @@ export default function ClientPage() {
       if (sharedPayload.template_id) {
         slicePayload.template_id = sharedPayload.template_id;
       }
-      if (isThreadedNutBoltTemplate) {
+      if (isSelectedMultiPartTemplate && selectedMultiPartParts) {
         slicePayload.multi_part = true;
-        slicePayload.parts = ["bolt", "nut"];
+        slicePayload.parts = selectedMultiPartParts;
         slicePayload.part_selector_param = "PART_MODE";
       }
 
@@ -944,13 +932,13 @@ export default function ClientPage() {
       sliceResultObjectUrlRef.current = url;
       setSliceResultBlobUrl(url);
 
-      const resultFileName = isThreadedNutBoltTemplate
+      const resultFileName = isSelectedMultiPartTemplate
         ? `${selected.id}-${Date.now()}-gcodes.zip`
         : `${selected.id.replace(".scad.j2", "")}-${Date.now()}.gcode`;
       setSliceResultFileName(resultFileName);
       setSliceResultMimeType(blob.type || "application/octet-stream");
 
-      if (!isThreadedNutBoltTemplate) {
+      if (!isSelectedMultiPartTemplate) {
         const gcodeText = await blob.text();
         setSliceInsight(parseGcodeInsights(gcodeText));
       } else {
@@ -958,7 +946,7 @@ export default function ClientPage() {
       }
 
       setStatusMsg(
-        isThreadedNutBoltTemplate
+        isSelectedMultiPartTemplate
           ? "G-code ZIP is ready. Review details, then click Download."
           : "G-code insights ready. Review and click Download G-code."
       );
@@ -988,9 +976,9 @@ export default function ClientPage() {
 
       setStatusMsg("Executing template…");
       const generatePayload = await buildTemplatePayload(normalized);
-      if (isThreadedNutBoltTemplate) {
+      if (isSelectedMultiPartTemplate && selectedMultiPartParts) {
         generatePayload.multi_part = true;
-        generatePayload.parts = ["bolt", "nut"];
+        generatePayload.parts = selectedMultiPartParts;
         generatePayload.part_selector_param = "PART_MODE";
       }
 
@@ -1006,12 +994,12 @@ export default function ClientPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = isThreadedNutBoltTemplate
+      a.download = isSelectedMultiPartTemplate
         ? `${selected.id}-${Date.now()}-stls.zip`
         : `${selected.id.replace(".scad.j2", "")}-${Date.now()}.stl`;
       a.click();
       window.URL.revokeObjectURL(url);
-      setStatusMsg(isThreadedNutBoltTemplate ? "Bolt and nut STL ZIP downloaded." : "STL downloaded successfully.");
+      setStatusMsg(isSelectedMultiPartTemplate ? "Multi-part STL ZIP downloaded." : "STL downloaded successfully.");
       loadRunHistory();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate STL";
@@ -1310,20 +1298,22 @@ export default function ClientPage() {
               </div>
             </div>
             <div className={styles.previewBox}>
-              {isThreadedNutBoltTemplate && (threadedPreviewUrls.bolt || threadedPreviewUrls.nut) ? (
+              {isSelectedMultiPartTemplate &&
+              selectedMultiPartParts &&
+              selectedMultiPartParts.some((part) => !!multiPartPreviewUrls[part]) ? (
                 <div className={styles.previewDualGrid}>
-                  <div className={styles.previewCard}>
-                    <p className={styles.previewCardTitle}>Bolt</p>
-                    <div className={styles.viewerWrap}>
-                      {threadedPreviewUrls.bolt ? <StlPreview url={threadedPreviewUrls.bolt} /> : <span>No bolt preview.</span>}
-                    </div>
-                  </div>
-                  <div className={styles.previewCard}>
-                    <p className={styles.previewCardTitle}>Nut</p>
-                    <div className={styles.viewerWrap}>
-                      {threadedPreviewUrls.nut ? <StlPreview url={threadedPreviewUrls.nut} /> : <span>No nut preview.</span>}
-                    </div>
-                  </div>
+                  {selectedMultiPartParts.map((part) => {
+                    const partLabel = part.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                    const partUrl = multiPartPreviewUrls[part] ?? null;
+                    return (
+                      <div key={part} className={styles.previewCard}>
+                        <p className={styles.previewCardTitle}>{partLabel}</p>
+                        <div className={styles.viewerWrap}>
+                          {partUrl ? <StlPreview url={partUrl} /> : <span>No {partLabel.toLowerCase()} preview.</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : previewUrl ? (
                 <div className={styles.viewerWrap}>

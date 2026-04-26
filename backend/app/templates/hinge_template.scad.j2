@@ -1,0 +1,89 @@
+//
+// CUSTOMIZABLE HINGE TEMPLATE
+// Parameters injected by backend.
+//
+
+pin_diameter = max({{PIN_DIAMETER}}, 1.0);
+leaf_length = max({{LEAF_LENGTH}}, 20.0);
+knuckle_count_input = {{KNUCKLE_COUNT}};
+part_mode = "{{ PART_MODE | default('both') }}";
+
+knuckle_count = max(floor(knuckle_count_input), 3);
+clearance = max(pin_diameter * 0.12, 0.2);
+leaf_thickness = max(pin_diameter * 0.8, 2.0);
+leaf_width = max(pin_diameter * 4.0, 12.0);
+barrel_outer_d = pin_diameter + 2 * max(pin_diameter * 0.55, 1.2);
+barrel_outer_r = barrel_outer_d / 2;
+
+knuckle_pitch = leaf_length / knuckle_count;
+knuckle_gap = clearance;
+knuckle_len = max(knuckle_pitch - knuckle_gap, 0.8);
+
+pin_hole_d = pin_diameter + clearance * 0.35;
+pin_length = leaf_length + clearance;
+part_spacing = max(leaf_width * 0.6, pin_diameter * 4, 8);
+second_part_offset_x = leaf_width + barrel_outer_r + part_spacing;
+
+module leaf_body(is_left) {
+    if (is_left) {
+        translate([-leaf_width - barrel_outer_r, -leaf_thickness / 2, 0])
+            cube([leaf_width, leaf_thickness, leaf_length], center = false);
+    } else {
+        translate([barrel_outer_r, -leaf_thickness / 2, 0])
+            cube([leaf_width, leaf_thickness, leaf_length], center = false);
+    }
+}
+
+module knuckle(is_left, z0, h) {
+    union() {
+        translate([0, 0, z0])
+            cylinder(h = h, d = barrel_outer_d, center = false, $fn = 72);
+
+        if (is_left) {
+            translate([-barrel_outer_r, -leaf_thickness / 2, z0])
+                cube([barrel_outer_r, leaf_thickness, h], center = false);
+        } else {
+            translate([0, -leaf_thickness / 2, z0])
+                cube([barrel_outer_r, leaf_thickness, h], center = false);
+        }
+    }
+}
+
+module hinge_body() {
+    // Wall-friendly hinge aligned on Z, centered in Y, resting on Z=0.
+    difference() {
+        union() {
+            leaf_body(true);
+            leaf_body(false);
+
+            for (i = [0:knuckle_count - 1]) {
+                z_start = i * knuckle_pitch + knuckle_gap / 2;
+                if ((i % 2) == 0) {
+                    knuckle(true, z_start, knuckle_len);
+                } else {
+                    knuckle(false, z_start, knuckle_len);
+                }
+            }
+        }
+
+        translate([0, 0, -0.02])
+            cylinder(h = leaf_length + 0.04, d = pin_hole_d, center = false, $fn = 72);
+    }
+}
+
+module hinge_pin() {
+    cylinder(h = pin_length, d = pin_diameter, center = false, $fn = 72);
+}
+
+// PART_MODE options:
+// - "both": render hinge body and pin on one bed (pin is second part)
+// - "hinge": render only hinge body
+// - "pin": render only pin
+if (part_mode == "both" || part_mode == "hinge") {
+    hinge_body();
+}
+
+if (part_mode == "both" || part_mode == "pin") {
+    translate([second_part_offset_x, 0, 0])
+        hinge_pin();
+}
